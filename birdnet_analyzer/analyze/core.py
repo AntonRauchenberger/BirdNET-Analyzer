@@ -1,9 +1,13 @@
 from collections.abc import Collection
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from birdnet.globals import ACOUSTIC_MODEL_VERSIONS, MODEL_LANGUAGES
 
 from birdnet_analyzer.config import RESULT_TYPES
+
+if TYPE_CHECKING:
+    from birdnet.acoustic_models.inference.scores import PredictionResultBase
 
 
 def analyze(
@@ -34,7 +38,7 @@ def analyze(
     locale: MODEL_LANGUAGES = "en_us",
     additional_columns: list[str] | None = None,
     use_perch: bool = False,  # TODO: aktuell useless, kann eigentlich weg, weil model param
-    _return_only=False
+    _return_only=False,
 ):
     """
     Analyzes audio files for bird species detection using the BirdNET-Analyzer.
@@ -117,117 +121,39 @@ def analyze(
     output: Path = Path(audio_input).parent if Path(audio_input).is_file() else Path(audio_input)
 
     if "table" in rtype:
-
-        def read_high_freq(file_path, sig_fmax, bandpass_fmax, audio_speed):
-            # TODO: is all of this REALLY necessary??
-            from birdnet_analyzer.audio import get_sample_rate
-
-            high_freq = get_sample_rate(file_path) / 2
-            high_freq = min(high_freq, int(sig_fmax / audio_speed))
-            return int(min(high_freq, int(bandpass_fmax / audio_speed)))
-
-        codes = load_codes()
-        df = predictions.to_dataframe()
-        n_rows = df.shape[0]
-        df["Selection"] = list(range(1, n_rows + 1))
-        df["View"] = ["Spectrogram 1"] * n_rows
-        df["Channel"] = [1] * n_rows
-        df["Low Freq (Hz)"] = [fmin] * n_rows
-        df["High Freq (Hz)"] = [fmax] * n_rows
-        # TODO: mach ich wenn Stefan es als metadaten im result mitgibt
-        # df["High Freq (Hz)"] = df["input"].map(partial(read_high_freq, sig_fmax=predictions.sig_fmax, bandpass_fmax=fmax, audio_speed=audio_speed))
-        # df["Low Freq (Hz)"] = [max(predictions.sig_fmin, int(fmin / audio_speed))] * n_rows
-        df["File Offset (s)"] = df["start_time"]
-        df[["Scientific Name", "Common Name"]] = df["species_name"].str.split("_", n=1, expand=True)
-        df["Species Code"] = df["Scientific Name"].map(lambda x: codes.get(str(x), str(x)))
-
-        df.rename(
-            columns={"start_time": "Begin Time (s)", "end_time": "End Time (s)", "input": "Begin Path", "confidence": "Confidence"},
-            inplace=True,
-        )
-
-        # Reordering
-        cols = [
-            "Selection",
-            "Begin Time (s)",
-            "End Time (s)",
-            "Common Name",
-            "Scientific Name",
-            "Species Code",
-            "Confidence",
-            "View",
-            "Channel",
-            "Low Freq (Hz)",
-            "High Freq (Hz)",
-            "Begin Path",
-        ]
-        # TODO: still missing "File Offset (s)"
-        df = df[cols]
-        df.to_csv(output / cfg.OUTPUT_RAVEN_FILENAME, sep="\t", index=False)
+        save_as_rtable(predictions, fmin, fmax, output / cfg.OUTPUT_RAVEN_FILENAME)
 
     if "csv" in rtype:
-        df = predictions.to_dataframe()
-        n_rows = df.shape[0]
-
-        if additional_columns:
-            possible_cols = {
-                "lat": lat if lat is not None else "",
-                "lon": lon if lon is not None else "",
-                "week": week if week is not None else "",
-                "overlap": overlap,
-                "sensitivity": sensitivity,
-                "min_conf": min_conf,
-                "species_list": species_list_file,
-                # "model": os.path.basename(cfg.MODEL_PATH), # TODO: am besten aus den prediction metadaten
-            }
-            for col in possible_cols:
-                if col in additional_columns:
-                    df[col] = possible_cols[col] * n_rows
-
-        df[["Scientific name", "Common name"]] = df["species_name"].str.split("_", n=1, expand=True)
-
-        df.rename(
-            columns={"input": "File", "start_time": "Start (s)", "end_time": "End (s)", "confidence": "Confidence"},
-            inplace=True,
+        save_as_csv(
+            predictions,
+            output / cfg.OUTPUT_CSV_FILENAME,
+            additional_columns,
+            lat,
+            lon,
+            week,
+            overlap,
+            min_conf,
+            sensitivity,
+            species_list_file,
         )
-
-        # Ordering
-        cols = ["Start (s)", "End (s)", "Scientific name", "Common name", "Confidence", "File"]
-        df = df[cols]
-
-        df.to_csv(output / cfg.OUTPUT_CSV_FILENAME, index=False)
 
     if "kaleidoscope" in rtype:
-        df = predictions.to_dataframe()
-        n_rows = df.shape[0]
-        df["INDIR"] = df["input"].map(lambda x: str(Path(x).parent.parent).rstrip("/"))
-        df["FOLDER"] = df["input"].map(lambda x: Path(x).parent.name)
-        df["IN FILE"] = df["input"].map(lambda x: Path(x).name)
-        df["DURATION"] = df["end_time"] - df["start_time"]
-        df[["scientific_name", "common_name"]] = df["species_name"].str.split("_", n=1, expand=True)
-        df["lat"] = (lat if lat is not None else "") * n_rows
-        df["lon"] = (lon if lon is not None else "") * n_rows
-        df["week"] = (week if week is not None else "") * n_rows
-        df["overlap"] = overlap * n_rows
-        df["sensitivity"] = sensitivity * n_rows
-
-        df.rename(
-            columns={
-                "start_time": "OFFSET",
-            },
-            inplace=True,
+        save_as_kaleidoscope(
+            predictions,
+            output / cfg.OUTPUT_KALEIDOSCOPE_FILENAME,
+            overlap,
+            sensitivity,
+            lat,
+            lon,
+            week,
         )
-
-        df.drop(columns=["input", "species_name", "end_time"], inplace=True)
-        df.to_csv(output / cfg.OUTPUT_KALEIDOSCOPE_FILENAME, index=False)
 
     # TODO: Verwendet jemand das??
     if "audacity" in rtype:
-        df = predictions.to_dataframe()
-
-        df = df[["start_time", "end_time", "species_name", "confidence"]]
-
-        df.to_csv(output / cfg.OUTPUT_AUDACITY_FILENAME, index=False, header=False, sep="\t")
+        save_as_audacity(
+            predictions,
+            output / cfg.OUTPUT_AUDACITY_FILENAME,
+        )
 
     save_params(
         output / cfg.ANALYSIS_PARAMS_FILENAME,
@@ -258,3 +184,131 @@ def analyze(
     )
 
     return None
+
+
+def save_as_rtable(predictions, fmin, fmax, outfile: Path):
+    from birdnet_analyzer.analyze.utils import load_codes
+
+    def read_high_freq(file_path, sig_fmax, bandpass_fmax, audio_speed):
+        # TODO: is all of this REALLY necessary??
+        from birdnet_analyzer.audio import get_sample_rate
+
+        high_freq = get_sample_rate(file_path) / 2
+        high_freq = min(high_freq, int(sig_fmax / audio_speed))
+        return int(min(high_freq, int(bandpass_fmax / audio_speed)))
+
+    codes = load_codes()
+    df = predictions.to_dataframe()
+    n_rows = df.shape[0]
+    df["Selection"] = list(range(1, n_rows + 1))
+    df["View"] = ["Spectrogram 1"] * n_rows
+    df["Channel"] = [1] * n_rows
+    df["Low Freq (Hz)"] = [fmin] * n_rows
+    df["High Freq (Hz)"] = [fmax] * n_rows
+    # TODO: mach ich wenn Stefan es als metadaten im result mitgibt
+    # df["High Freq (Hz)"] = df["input"].map(partial(read_high_freq, sig_fmax=predictions.sig_fmax, bandpass_fmax=fmax, audio_speed=audio_speed))
+    # df["Low Freq (Hz)"] = [max(predictions.sig_fmin, int(fmin / audio_speed))] * n_rows
+    df["File Offset (s)"] = df["start_time"]
+    df[["Scientific Name", "Common Name"]] = df["species_name"].str.split("_", n=1, expand=True)
+    df["Species Code"] = df["Scientific Name"].map(lambda x: codes.get(str(x), str(x)))
+
+    df.rename(
+        columns={"start_time": "Begin Time (s)", "end_time": "End Time (s)", "input": "Begin Path", "confidence": "Confidence"},
+        inplace=True,
+    )
+
+    # Reordering
+    cols = [
+        "Selection",
+        "Begin Time (s)",
+        "End Time (s)",
+        "Common Name",
+        "Scientific Name",
+        "Species Code",
+        "Confidence",
+        "View",
+        "Channel",
+        "Low Freq (Hz)",
+        "High Freq (Hz)",
+        "Begin Path",
+    ]
+    # TODO: still missing "File Offset (s)"
+    df = df[cols]
+    df.to_csv(outfile, sep="\t", index=False)
+
+
+def save_as_csv(
+    predictions,
+    output: Path,
+    additional_columns: list[str] | None = None,
+    lat=None,
+    lon=None,
+    week=None,
+    overlap=None,
+    min_conf=None,
+    sensitivity=None,
+    species_list_file=None,
+):
+    df = predictions.to_dataframe()
+    n_rows = df.shape[0]
+
+    if additional_columns:
+        possible_cols = {
+            "lat": lat if lat is not None else "",
+            "lon": lon if lon is not None else "",
+            "week": week if week is not None else "",
+            "overlap": overlap,
+            "sensitivity": sensitivity,
+            "min_conf": min_conf,
+            "species_list": species_list_file,
+            # "model": os.path.basename(cfg.MODEL_PATH), # TODO: am besten aus den prediction metadaten
+        }
+        for col in possible_cols:
+            if col in additional_columns:
+                df[col] = possible_cols[col] * n_rows
+
+    df[["Scientific name", "Common name"]] = df["species_name"].str.split("_", n=1, expand=True)
+
+    df.rename(
+        columns={"input": "File", "start_time": "Start (s)", "end_time": "End (s)", "confidence": "Confidence"},
+        inplace=True,
+    )
+
+    # Ordering
+    cols = ["Start (s)", "End (s)", "Scientific name", "Common name", "Confidence", "File"]
+    df = df[cols]
+
+    df.to_csv(output, index=False)
+
+
+def save_as_kaleidoscope(predictions, output: Path, overlap, sensitivity, lat=None, lon=None, week=None):
+    df = predictions.to_dataframe()
+    n_rows = df.shape[0]
+    df["INDIR"] = df["input"].map(lambda x: str(Path(x).parent.parent).rstrip("/"))
+    df["FOLDER"] = df["input"].map(lambda x: Path(x).parent.name)
+    df["IN FILE"] = df["input"].map(lambda x: Path(x).name)
+    df["DURATION"] = df["end_time"] - df["start_time"]
+    df[["scientific_name", "common_name"]] = df["species_name"].str.split("_", n=1, expand=True)
+    df["lat"] = (lat if lat is not None else "") * n_rows
+    df["lon"] = (lon if lon is not None else "") * n_rows
+    df["week"] = (week if week is not None else "") * n_rows
+    df["overlap"] = overlap * n_rows
+    df["sensitivity"] = sensitivity * n_rows
+
+    df.rename(
+        columns={
+            "start_time": "OFFSET",
+        },
+        inplace=True,
+    )
+
+    df.drop(columns=["input", "species_name", "end_time"], inplace=True)
+    df.to_csv(output, index=False)
+
+
+def save_as_audacity(predictions, output: Path):
+    df = predictions.to_dataframe()
+
+    df = df[["start_time", "end_time", "species_name", "confidence"]]
+
+    df.to_csv(output, index=False, header=False, sep="\t")

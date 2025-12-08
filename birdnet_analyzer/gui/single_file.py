@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import gradio as gr
 
@@ -6,8 +7,14 @@ import birdnet_analyzer.config as cfg
 import birdnet_analyzer.gui.localization as loc
 import birdnet_analyzer.gui.utils as gu
 from birdnet_analyzer import audio, utils
+from birdnet_analyzer.analyze.core import save_as_csv, save_as_kaleidoscope, save_as_rtable
 
 MATPLOTLIB_FIGURE_NUM = "single-file-tab-spectrogram-plot"
+HEADER_START_LBL = loc.localize("single-tab-output-header-start")
+HEADER_END_LBL = loc.localize("single-tab-output-header-end")
+HEADER_SCI_NAME_LBL = loc.localize("single-tab-output-header-sci-name")
+HEADER_COMMON_NAME_LBL = loc.localize("single-tab-output-header-common-name")
+HEADER_CONFIDENCE_LBL = loc.localize("single-tab-output-header-confidence")
 
 
 @gu.gui_runtime_error_handler
@@ -33,7 +40,6 @@ def run_single_file_analysis(
     custom_classifier_file,
     locale,
 ):
-    import csv
     from datetime import timedelta
 
     from birdnet_analyzer.gui.analysis import run_analysis
@@ -79,26 +85,35 @@ def run_single_file_analysis(
         progress=None,
     )
 
+    def convert_to_time_str(seconds: float) -> str:
+        time_str = str(timedelta(seconds=seconds))
+        if "." in time_str:
+            time_str = time_str[: time_str.index(".") + 2]
+        return time_str
+
     table = predictions.to_dataframe()
+    n_rows = table.shape[0]
+    table[[HEADER_SCI_NAME_LBL, HEADER_COMMON_NAME_LBL]] = table["species_name"].str.split("_", n=1, expand=True)
 
-    # # read the result file to return the data to be displayed.
-    # with open(result_filepath, encoding="utf-8") as f:
-    #     reader = csv.reader(f)
-    #     data = list(reader)
-    #     data = [lc[0:-1] for lc in data[1:]]  # remove last column (file path) and first row (header)
+    table[" "] = ["▶"] * n_rows
+    table.rename(
+        columns={
+            "start_time": HEADER_START_LBL,
+            "end_time": HEADER_END_LBL,
+            "confidence": HEADER_CONFIDENCE_LBL,
+        },
+        inplace=True,
+    )
+    table[HEADER_START_LBL] = table[HEADER_START_LBL].apply(convert_to_time_str)
+    table[HEADER_END_LBL] = table[HEADER_END_LBL].apply(convert_to_time_str)
+    table = table[[" ", HEADER_START_LBL, HEADER_END_LBL, HEADER_SCI_NAME_LBL, HEADER_COMMON_NAME_LBL, HEADER_CONFIDENCE_LBL]]
+    table[HEADER_CONFIDENCE_LBL] = table[HEADER_CONFIDENCE_LBL].apply(lambda x: f"{x:0.3f}")
 
-    #     for row in data:
-    #         for col_idx in range(2):
-    #             seconds = float(row[col_idx])
-    #             time_str = str(timedelta(seconds=seconds))
-
-    #             if "." in time_str:
-    #                 time_str = time_str[: time_str.index(".") + 2]
-
-    #             row[col_idx] = time_str
-    #         row.insert(0, "▶")
-
-    return table, gr.update(visible=True), predictions
+    return (
+        table,
+        gr.update(visible=True),
+        {"predictions": predictions, "fmin": fmin, "fmax": fmax, "overlap": overlap, "sensitivity": sensitivity, "lat": lat, "lon": lon, "week": week},
+    )
 
 
 def build_single_analysis_tab():
@@ -120,20 +135,20 @@ def build_single_analysis_tab():
         single_file_analyze = gr.Button(loc.localize("analyze-start-button-label"), variant="huggingface", interactive=False)
 
         with gr.Row(visible=False) as action_row:
-            table_download_button = gr.Button(
-                loc.localize("single-tab-download-button-label"),
-            )
+            rtable_download_button = gr.Button(loc.localize("single-tab-download-rtable-button-label"))
+            csv_download_button = gr.Button(loc.localize("single-tab-download-csv-button-label"))
+            kaleidoscope_download_button = gr.Button(loc.localize("single-tab-download-kaleidoscope-button-label"))
             segment_audio = gr.Audio(autoplay=True, type="numpy", show_download_button=True, show_label=False, editable=False, visible=False)
 
         output_dataframe = gr.Dataframe(
             type="pandas",
             headers=[
-                "",
-                loc.localize("single-tab-output-header-start"),
-                loc.localize("single-tab-output-header-end"),
-                loc.localize("single-tab-output-header-sci-name"),
-                loc.localize("single-tab-output-header-common-name"),
-                loc.localize("single-tab-output-header-confidence"),
+                " ",
+                HEADER_START_LBL,
+                HEADER_END_LBL,
+                HEADER_SCI_NAME_LBL,
+                HEADER_COMMON_NAME_LBL,
+                HEADER_CONFIDENCE_LBL,
             ],
             elem_id="single-file-output",
             interactive=False,
@@ -215,26 +230,65 @@ def build_single_analysis_tab():
                 end = time_to_seconds(evt.row_value[2])
 
                 data, sr = audio.open_audio_file(audio_path, offset=start, duration=end - start)
+
                 return gr.update(visible=True, value=(sr, data))
 
             return gr.update()
 
-        def download_table(filepath):
-            if filepath:
-                ext = os.path.splitext(filepath)[1]
+        def download_rtable(prediction_state):
+            if prediction_state:
                 file_location = gu.save_file_dialog(
                     state_key="single-file-table",
-                    default_filename=os.path.basename(filepath),
-                    filetypes=(f"{ext[1:]} (*{ext})",),
+                    default_filename=cfg.OUTPUT_RAVEN_FILENAME,
+                    filetypes=("txt (*.txt)",),
                 )
 
                 if file_location:
-                    with open(filepath, "rb") as src, open(file_location, "wb") as dst:
-                        dst.write(src.read())
+                    save_as_rtable(
+                        prediction_state["predictions"],
+                        prediction_state["fmin"],
+                        prediction_state["fmax"],
+                        Path(file_location),
+                    )
+
+        def download_csv(prediction_state):
+            if prediction_state:
+                file_location = gu.save_file_dialog(
+                    state_key="single-file-table",
+                    default_filename=cfg.OUTPUT_CSV_FILENAME,
+                    filetypes=("CSV (*.csv)",),
+                )
+
+                if file_location:
+                    save_as_csv(
+                        prediction_state["predictions"],
+                        Path(file_location),
+                    )
+
+        def download_kaleidoscope(prediction_state):
+            if prediction_state:
+                file_location = gu.save_file_dialog(
+                    state_key="single-file-table",
+                    default_filename=cfg.OUTPUT_KALEIDOSCOPE_FILENAME,
+                    filetypes=("Kaleidoscope (*.txt)",),
+                )
+
+                if file_location:
+                    save_as_kaleidoscope(
+                        prediction_state["predictions"],
+                        Path(file_location),
+                        prediction_state["overlap"],
+                        prediction_state["sensitivity"],
+                        prediction_state["lat"],
+                        prediction_state["lon"],
+                        prediction_state["week"],
+                    )
 
         output_dataframe.select(get_selected_audio, inputs=audio_path_state, outputs=segment_audio)
         single_file_analyze.click(run_single_file_analysis, inputs=inputs, outputs=[output_dataframe, action_row, last_prediction_state])
-        table_download_button.click(download_table, inputs=last_prediction_state)
+        rtable_download_button.click(download_rtable, inputs=last_prediction_state)
+        csv_download_button.click(download_csv, inputs=last_prediction_state)
+        kaleidoscope_download_button.click(download_kaleidoscope, inputs=last_prediction_state)
 
     return species_settings["lat_number"], species_settings["lon_number"], species_settings["map_plot"]
 

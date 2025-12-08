@@ -1,7 +1,7 @@
 # ruff: noqa: E501
 import argparse
 import os
-from typing import cast
+from typing import cast, get_args
 
 from birdnet.globals import MODEL_LANGUAGE_EN_US, MODEL_LANGUAGES
 
@@ -292,7 +292,7 @@ def locale_args():
         "-l",
         "--locale",
         default=cast("str", MODEL_LANGUAGE_EN_US),
-        choices=cast("list[str]", MODEL_LANGUAGES),
+        choices=get_args(MODEL_LANGUAGES),
         help="Locale for translated species common names.",
     )
 

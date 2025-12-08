@@ -19,6 +19,7 @@ def run_interference(
     label_language: MODEL_LANGUAGES = "en_us",
     classifier: str | None = None,
     cc_species_list: str | None = None,
+    callback=None,
 ):
     if classifier:
         if not cc_species_list:
@@ -42,6 +43,7 @@ def run_interference(
         speed=speed,
         default_confidence_threshold=min_confidence,
         custom_species_list=custom_species_list,
+        progress_callback=callback,
     )
 
 

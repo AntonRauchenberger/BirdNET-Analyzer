@@ -9,10 +9,11 @@ import warnings
 from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast, get_args
 
 import gradio as gr
 import webview
+from birdnet.globals import MODEL_LANGUAGE_EN_US, MODEL_LANGUAGES
 
 import birdnet_analyzer.config as cfg
 import birdnet_analyzer.gui.localization as loc
@@ -451,12 +452,11 @@ def locale():
     Returns:
         The dropdown element.
     """
-    label_files = os.listdir(ORIGINAL_TRANSLATED_LABELS_PATH)
-    options = ["EN"] + [label_file.split("BirdNET_GLOBAL_6K_V2.4_Labels_", 1)[1].split(".txt")[0].upper() for label_file in label_files]
+    options = get_args(MODEL_LANGUAGES)[0]
 
     return gr.Dropdown(
-        options,
-        value="EN",
+        get_args(options),
+        value=cast("str", MODEL_LANGUAGE_EN_US),
         label=loc.localize("analyze-locale-dropdown-label"),
         info=loc.localize("analyze-locale-dropdown-info"),
     )

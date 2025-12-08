@@ -234,7 +234,7 @@
     "settings-tab-title": "Настройки",
     "single-audio-label": "файл",
     "single-tab-analyze-file-error": "Невозможно проанализировать файл",
-    "single-tab-download-button-label": "Результаты загрузки",
+    "single-tab-download-rtable-button-label": "Скачать таблицу «Raven»",
     "single-tab-generate-spectrogram-error": "Невозможно создать спектрограмму",
     "single-tab-output-header-common-name": "Общее название",
     "single-tab-output-header-confidence": "Достоверность",

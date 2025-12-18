@@ -198,7 +198,7 @@ def generate_csv(timestamps: list[str], result: dict[str, list], afile_path: str
 
     Args:
         timestamps (list[str]): A list of timestamp strings in the format "start-end".
-        result (dict[str, list]): A dictionary where keys are timestamp strings and values are lists of tuples.
+        result (dict[str, list): A dictionary where keys are timestamp strings and values are lists of tuples.
                                   Each tuple contains a label and a confidence score.
         afile_path (str): The file path of the audio file being analyzed.
         result_path (str): The file path where the resulting CSV file will be saved.
@@ -668,7 +668,8 @@ def analyze_file(item) -> dict[str, str] | None:
     result_file_names = get_result_file_names(fpath)
 
     if cfg.SKIP_EXISTING_RESULTS and all(os.path.exists(f) for f in result_file_names.values()):
-        print(f"Skipping {fpath} as it has already been analyzed", flush=True)
+        if not cfg.SHOW_PROGRESS:
+            print(f"Skipping {fpath} as it has already been analyzed", flush=True)
         return None  # or return path to combine later? TODO
 
     # Start time
@@ -676,7 +677,8 @@ def analyze_file(item) -> dict[str, str] | None:
     results = {}
 
     # Status
-    print(f"Analyzing {fpath}", flush=True)
+    if not cfg.SHOW_PROGRESS:
+        print(f"Analyzing {fpath}", flush=True)
 
     # Process each chunk
     try:
@@ -701,7 +703,8 @@ def analyze_file(item) -> dict[str, str] | None:
 
     except Exception as ex:
         # Write error log
-        print(f"Error: Cannot analyze audio file {fpath}.\n", flush=True)
+        if not cfg.SHOW_PROGRESS:
+            print(f"Error: Cannot analyze audio file {fpath}.\n", flush=True)
         utils.write_error_log(ex)
         msg = str(ex)
 
@@ -713,12 +716,14 @@ def analyze_file(item) -> dict[str, str] | None:
 
     except Exception as ex:
         # Write error log
-        print(f"Error: Cannot save result for {fpath}.\n", flush=True)
+        if not cfg.SHOW_PROGRESS:
+            print(f"Error: Cannot save result for {fpath}.\n", flush=True)
         utils.write_error_log(ex)
 
         return str(ex)
 
     delta_time = (datetime.datetime.now() - start_time).total_seconds()
-    print(f"Finished {fpath} in {delta_time:.2f} seconds", flush=True)
+    if not cfg.SHOW_PROGRESS:
+        print(f"Finished {fpath} in {delta_time:.2f} seconds", flush=True)
 
     return result_file_names

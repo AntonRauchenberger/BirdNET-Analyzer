@@ -1,6 +1,8 @@
 import os
 from typing import Literal
 
+from tqdm import tqdm
+
 
 def analyze(
     audio_input: str,
@@ -18,6 +20,7 @@ def analyze(
     fmax: int = 15000,
     audio_speed: float = 1.0,
     batch_size: int = 1,
+    show_progress: bool = False,
     combine_results: bool = False,
     rtype: Literal["table", "audacity", "kaleidoscope", "csv"] | list[Literal["table", "audacity", "kaleidoscope", "csv"]] = "table",
     skip_existing_results: bool = False,
@@ -98,6 +101,7 @@ def analyze(
         labels_file=cfg.LABELS_FILE,
         additional_columns=additional_columns,
         use_perch=use_perch,
+        show_progress=show_progress,
     )
 
     print(f"Found {len(cfg.FILE_LIST)} files to analyze")
@@ -111,15 +115,11 @@ def analyze(
 
     # Analyze files
     if cfg.CPU_THREADS < 2 or len(flist) < 2:
-        result_files.extend(analyze_file(f) for f in flist)
+        result_files.extend(tqdm((analyze_file(f) for f in flist), total=len(flist), desc="Processing audio files...", disable=not cfg.SHOW_PROGRESS))
     else:
         with Pool(cfg.CPU_THREADS) as p:
             # Map analyzeFile function to each entry in flist
-            results = p.map_async(analyze_file, flist)
-            # Wait for all tasks to complete
-            results.wait()
-            result_files = results.get()
-
+            result_files = list(tqdm(p.imap(analyze_file, flist), total=len(flist), desc="Processing audio files...", disable=not cfg.SHOW_PROGRESS))
     # Combine results?
     if cfg.COMBINE_RESULTS:
         print(f"Combining results, writing to {cfg.OUTPUT_PATH}...", end="", flush=True)
@@ -155,6 +155,7 @@ def _set_params(
     labels_file=None,
     additional_columns=None,
     use_perch=False,
+    show_progress=True,
 ):
     import birdnet_analyzer.config as cfg
     from birdnet_analyzer.analyze.utils import load_codes
@@ -201,6 +202,7 @@ def _set_params(
     cfg.BATCH_SIZE = bs
     cfg.ADDITIONAL_COLUMNS = additional_columns
     cfg.USE_PERCH = use_perch
+    cfg.SHOW_PROGRESS = show_progress
 
     if cfg.USE_PERCH and custom_classifier:
         raise ValueError("Selected custom classifier and Perch model, please select only one.")

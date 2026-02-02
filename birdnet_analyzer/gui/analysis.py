@@ -8,12 +8,12 @@ from birdnet.globals import MODEL_LANGUAGES
 
 import birdnet_analyzer.config as cfg
 import birdnet_analyzer.gui.utils as gu
-from birdnet_analyzer import model
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 ORIGINAL_LABELS_FILE = str(Path(SCRIPT_DIR).parent / cfg.BIRDNET_LABELS_FILE)
 
 foo_counter = 0
+
 
 def on_progress(update: AcousticProgressStats, progress: gr.Progress):
     global foo_counter
@@ -23,6 +23,7 @@ def on_progress(update: AcousticProgressStats, progress: gr.Progress):
     foo_counter += 1
     # if progress is not None and update.progress_current and update.progress_total:
     #     progress((update.progress_current, update.progress_total), total=update.progress_total, unit="files", desc="es war einmal")
+
 
 def run_analysis(
     input_path: str | None,
@@ -47,13 +48,12 @@ def run_analysis(
     custom_classifier_file,
     output_types: cfg.RESULT_TYPES | list[cfg.RESULT_TYPES],
     additional_columns: list[str] | None,
-    combine_tables: bool,
     locale: MODEL_LANGUAGES,
     batch_size: int,
-    threads: int,
     input_dir: str | None,
-    skip_existing: bool,
     save_params: bool,
+    n_producers,
+    n_workers,
     progress: gr.Progress | None,
 ):
     """Starts the analysis.
@@ -81,21 +81,16 @@ def run_analysis(
         output_filename: The filename for the combined output.
         locale: The translation to be used.
         batch_size: The number of samples in a batch.
-        threads: The number of threads to be used.
+        n_producers: The number of producer threads to be used.
+        n_workers: The number of worker threads to be used.
         input_dir: The input directory.
         progress: The gradio progress bar.
     """
     import birdnet_analyzer.gui.localization as loc
     from birdnet_analyzer.analyze import analyze
 
-    if progress is not None:
-        progress(0, desc=f"{loc.localize('progress-preparing')} ...")
-
     if species_list_choice == gu._CUSTOM_SPECIES:
         gu.validate(species_list_file, loc.localize("validation-no-species-list-selected"))
-
-    if fmin is None or fmax is None or fmin < cfg.SIG_FMIN or fmax > cfg.SIG_FMAX or fmin > fmax:
-        raise gr.Error(f"{loc.localize('validation-no-valid-frequency')} [{cfg.SIG_FMIN}, {cfg.SIG_FMAX}]")
 
     locale = locale.lower()
     custom_classifier = custom_classifier_file if selected_model == gu._CUSTOM_CLASSIFIER else None
@@ -105,22 +100,19 @@ def run_analysis(
     lon = lon if species_list_choice == gu._PREDICT_SPECIES else None
     week = None if use_yearlong else week
 
-    if selected_model == gu._CUSTOM_CLASSIFIER:
-        if custom_classifier_file is None:
-            raise gr.Error(loc.localize("validation-no-custom-classifier-selected"))
-
-        model.reset_custom_classifier()
+    if selected_model == gu._CUSTOM_CLASSIFIER and custom_classifier_file is None:
+        raise gr.Error(loc.localize("validation-no-custom-classifier-selected"))
 
     if progress is not None:
         progress(0, desc=f"{loc.localize('progress-starting')} ...")
 
     return analyze(
-        audio_input=input_dir if input_dir else input_path,  # type: ignore
+        audio_input=input_dir or input_path,  # type: ignore
         min_conf=confidence,
         sensitivity=sensitivity,
         locale=locale,
         overlap=overlap,
-        audio_speed=max(0.1, 1.0 / (audio_speed * -1)) if audio_speed < 0 else max(1.0, float(audio_speed)),
+        audio_speed=audio_speed,
         fmin=fmin,
         fmax=fmax,
         batch_size=batch_size,
@@ -138,5 +130,8 @@ def run_analysis(
         classifier=custom_classifier,
         cc_species_list=None,  # always default search path in GUI currently
         on_update=partial(on_progress, progress=progress) if callable(progress) else None,
+        save_params=save_params,
+        n_producers=n_producers,
+        n_workers=n_workers,
         _return_only=bool(input_path),  # only for single file tab
     )

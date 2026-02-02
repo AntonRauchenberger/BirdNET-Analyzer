@@ -139,10 +139,6 @@ OUTPUT_AUDACITY_FILENAME: str = "BirdNET_AudacityLabels.txt"
 # File name of the settings csv for batch analysis
 ANALYSIS_PARAMS_FILENAME: str = "BirdNET_analysis_params.csv"
 
-# Whether to skip existing results in the output path
-# If set to False, existing files will not be overwritten
-SKIP_EXISTING_RESULTS: bool = False
-
 COMBINE_RESULTS: bool = False
 
 LABEL_LANGUAGE: MODEL_LANGUAGES = MODEL_LANGUAGE_EN_US

@@ -1,7 +1,6 @@
 import gradio as gr
 from birdnet.globals import MODEL_LANGUAGE_EN_US
 
-import birdnet_analyzer.config as cfg
 import birdnet_analyzer.gui.localization as loc
 import birdnet_analyzer.gui.utils as gu
 
@@ -46,12 +45,11 @@ def run_batch_analysis(
     custom_classifier_file,
     output_type,
     additional_columns,
-    combine_tables,
     locale,
     batch_size,
-    threads,
+    producers_number,
+    workers_number,
     input_dir,
-    skip_existing,
     progress=gr.Progress(),
 ):
     from birdnet_analyzer.gui.analysis import run_analysis
@@ -81,16 +79,14 @@ def run_batch_analysis(
         custom_classifier_file=custom_classifier_file,
         output_types=output_type,
         additional_columns=additional_columns,
-        combine_tables=combine_tables,
         locale=locale if locale else MODEL_LANGUAGE_EN_US,
         batch_size=batch_size if batch_size and batch_size > 0 else 1,
-        threads=None, # TODO: nr_worker exposen
         input_dir=input_dir,
-        skip_existing=skip_existing,
         save_params=True,
         progress=progress,
+        n_producers=producers_number,
+        n_workers=workers_number,
     )
-
     skipped_files = [[results.inputs[ui]] for ui in results.unprocessable_inputs]
     header = (
         [loc.localize("multi-tab-result-dataframe-column-invalid-file-header")]
@@ -164,42 +160,10 @@ def build_multi_analysis_tab():
                 info=loc.localize("multi-tab-additional-columns-checkbox-info"),
             )
 
-            with gr.Row():
-                combine_tables_checkbox = gr.Checkbox(
-                    False,
-                    label=loc.localize("multi-tab-output-combine-tables-checkbox-label"),
-                    info=loc.localize("multi-tab-output-combine-tables-checkbox-info"),
-                )
-
-            with gr.Row():
-                skip_existing_checkbox = gr.Checkbox(
-                    False,
-                    label=loc.localize("multi-tab-skip-existing-checkbox-label"),
-                    info=loc.localize("multi-tab-skip-existing-checkbox-info"),
-                )
-
-        with gr.Row():
-            batch_size_number = gr.Number(
-                precision=1,
-                label=loc.localize("multi-tab-batchsize-number-label"),
-                value=1,
-                info=loc.localize("multi-tab-batchsize-number-info"),
-                minimum=1,
-            )
-            threads_number = gr.Number(
-                precision=1,
-                label=loc.localize("multi-tab-threads-number-label"),
-                value=4,
-                info=loc.localize("multi-tab-threads-number-info"),
-                minimum=1,
-            )
-
+        bs_number, producers_number, workers_number = gu.computing_settings()
         locale_radio = gu.locale()
-
         start_batch_analysis_btn = gr.Button(loc.localize("analyze-start-button-label"), variant="huggingface")
-
         result_grid = gr.Matrix(headers=[""], col_count=1)
-
         inputs = [
             output_directory_predict_state,
             sample_settings["use_top_n_checkbox"],
@@ -222,12 +186,11 @@ def build_multi_analysis_tab():
             model_settings["selected_classifier_state"],
             output_type_radio,
             additional_columns_,
-            combine_tables_checkbox,
             locale_radio,
-            batch_size_number,
-            threads_number,
+            bs_number,
+            producers_number,
+            workers_number,
             input_directory_state,
-            skip_existing_checkbox,
         ]
 
         def show_additional_columns(values):

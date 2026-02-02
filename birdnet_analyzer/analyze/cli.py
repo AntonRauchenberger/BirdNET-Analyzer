@@ -1,3 +1,5 @@
+import contextlib
+
 from birdnet_analyzer import analyze
 from birdnet_analyzer.utils import runtime_error_handler
 
@@ -15,11 +17,9 @@ def main():
     parser = cli.analyzer_parser()
     args = parser.parse_args()
 
-    try:
+    with contextlib.suppress(Exception):
         if os.get_terminal_size().columns >= 64:
             print(cli.ASCII_LOGO, flush=True)
-    except Exception:
-        pass
 
     if args.additional_columns and "csv" not in args.rtype:
         import warnings

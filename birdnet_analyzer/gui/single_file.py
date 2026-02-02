@@ -69,13 +69,12 @@ def run_single_file_analysis(
         custom_classifier_file=custom_classifier_file,
         output_types="csv",
         additional_columns=None,
-        combine_tables=False,
         locale=locale if locale else "en_us",
         batch_size=1,
-        threads=4,
         input_dir=None,
-        skip_existing=False,
         save_params=False,
+        n_producers=1,
+        n_workers=None,
         progress=None,
     )
 
@@ -117,7 +116,7 @@ def build_single_analysis_tab():
         with gr.Group():
             spectogram_output = gr.Plot(label=loc.localize("review-tab-spectrogram-plot-label"), visible=False, show_label=False)
             generate_spectrogram_cb = gr.Checkbox(
-                value=True,
+                value=False,
                 label=loc.localize("single-tab-spectrogram-checkbox-label"),
                 info=loc.localize("single-tab-spectrogram-checkbox-info"),
             )
@@ -239,9 +238,12 @@ def build_single_analysis_tab():
 
                 if file_location:
                     save_as_rtable(
-                        prediction_state["predictions"],
+                        prediction_state["predictions"].to_dataframe(),
                         prediction_state["fmin"],
                         prediction_state["fmax"],
+                        prediction_state["predictions"].model_fmin,
+                        prediction_state["predictions"].model_fmax,
+                        prediction_state["audio_speed"],
                         Path(file_location),
                     )
 
@@ -255,7 +257,7 @@ def build_single_analysis_tab():
 
                 if file_location:
                     save_as_csv(
-                        prediction_state["predictions"],
+                        prediction_state["predictions"].to_dataframe(),
                         Path(file_location),
                     )
 
@@ -269,13 +271,8 @@ def build_single_analysis_tab():
 
                 if file_location:
                     save_as_kaleidoscope(
-                        prediction_state["predictions"],
+                        prediction_state["predictions"].to_dataframe(),
                         Path(file_location),
-                        prediction_state["overlap"],
-                        prediction_state["sensitivity"],
-                        prediction_state["lat"],
-                        prediction_state["lon"],
-                        prediction_state["week"],
                     )
 
         output_dataframe.select(get_selected_audio, inputs=audio_path_state, outputs=segment_audio)

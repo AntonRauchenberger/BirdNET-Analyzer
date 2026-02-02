@@ -416,20 +416,7 @@ def sample_sliders(opened=True) -> dict[_SAMPLE_KEYS, gr.components.Component]:
                     info=loc.localize("inference-settings-audio-speed-slider-info"),
                 )
 
-            with gr.Row():
-                fmin_number = gr.Number(
-                    cfg.SIG_FMIN,
-                    minimum=0,
-                    label=loc.localize("inference-settings-fmin-number-label"),
-                    info=loc.localize("inference-settings-fmin-number-info"),
-                )
-
-                fmax_number = gr.Number(
-                    cfg.SIG_FMAX,
-                    minimum=0,
-                    label=loc.localize("inference-settings-fmax-number-label"),
-                    info=loc.localize("inference-settings-fmax-number-info"),
-                )
+            fmin_number, fmax_number = bandpass_settings()
 
         return {
             "use_top_n_checkbox": use_top_n_checkbox,
@@ -442,6 +429,25 @@ def sample_sliders(opened=True) -> dict[_SAMPLE_KEYS, gr.components.Component]:
             "fmin_number": fmin_number,
             "fmax_number": fmax_number,
         }
+
+
+def bandpass_settings():
+    with gr.Row():
+        fmin_number = gr.Number(
+            cfg.SIG_FMIN,
+            minimum=0,
+            label=loc.localize("inference-settings-fmin-number-label"),
+            info=loc.localize("inference-settings-fmin-number-info"),
+        )
+
+        fmax_number = gr.Number(
+            cfg.SIG_FMAX,
+            minimum=0,
+            label=loc.localize("inference-settings-fmax-number-label"),
+            info=loc.localize("inference-settings-fmax-number-info"),
+        )
+
+    return fmin_number, fmax_number
 
 
 def locale():
@@ -821,6 +827,39 @@ def _get_win_drives():
     from string import ascii_uppercase as UPPER_CASE
 
     return [f"{drive}:\\" for drive in UPPER_CASE] + _get_network_shortcuts()
+
+
+def computing_settings():
+    import psutil
+
+    with gr.Row():
+        bs_number = gr.Number(
+            precision=1,
+            label=loc.localize("computing-settings-batchsize-number-label"),
+            value=1,
+            info=loc.localize("computing-settings-batchsize-number-info"),
+            minimum=1,
+        )
+        producers_number = gr.Number(
+            precision=1,
+            label=loc.localize("computing-settings-producers-number-label"),
+            value=1,
+            info=loc.localize("computing-settings-producers-number-info"),
+            minimum=1,
+        )
+        workers_number = gr.Number(
+            precision=1,
+            label=loc.localize("computing-settings-workers-number-label"),
+            value=psutil.cpu_count(logical=True) or 1,
+            info=loc.localize("computing-settings-workers-number-info"),
+            minimum=1,
+        )
+
+    return bs_number, producers_number, workers_number
+
+
+def slider_to_value(value: float):
+    return max(0.1, 1.0 / (value * -1)) if value < 0 else max(1.0, float(value))
 
 
 def open_window(builder: list[Callable] | Callable):

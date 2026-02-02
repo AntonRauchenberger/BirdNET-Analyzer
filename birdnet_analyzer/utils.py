@@ -295,6 +295,18 @@ def write_error_log(ex: Exception):
         elog.write(datetime.datetime.now().strftime("[%Y-%m-%d %H:%M:%S]") + "\n" + "".join(traceback.TracebackException.from_exception(ex).format()) + "\n")
 
 
+def load_codes() -> dict[str, str]:
+    """Loads the eBird codes.
+
+    Returns:
+        A dictionary containing the eBird codes.
+    """
+    import json
+
+    with open(os.path.join(SCRIPT_DIR, cfg.CODES_FILE), encoding="utf-8") as cfile:
+        return json.load(cfile)
+
+
 def img2base64(path):
     import base64
 
@@ -302,7 +314,7 @@ def img2base64(path):
         return base64.b64encode(img_file.read()).decode("utf-8")
 
 
-def save_params(file_path, headers, values):
+def save_params_to_file(file_path, headers, values):
     """Saves the params used to train the custom classifier.
 
     The hyperparams will be saved to disk in a file named 'model_params.csv'.
@@ -334,4 +346,3 @@ def save_result_file(result_path: str, out_string: str):
     # Write the result to the file
     with open(result_path, "w", encoding="utf-8") as rfile:
         rfile.write(out_string)
-

@@ -471,6 +471,13 @@ def analyzer_parser():
     parser.add_argument("--split_tables", action="store_true", help="Saves separate result tables for each input audio file in the output.")
     parser.set_defaults(model="birdnet")
 
+    parser.add_argument(
+        "--show_progress",
+        action="store_true",
+        default=False,
+        help="Show progress bar during analysis.",
+    )
+
     return parser
 
 

@@ -11,7 +11,7 @@ from perch_hoplite.db import sqlite_usearch_impl
 from tqdm import tqdm
 
 import birdnet_analyzer.config as cfg
-from birdnet_analyzer import utils
+from birdnet_analyzer import model_utils, utils
 from birdnet_analyzer.analyze.utils import iterate_audio_chunks
 from birdnet_analyzer.embeddings.core import get_or_create_database
 
@@ -180,87 +180,52 @@ def consumer(q: mp.Queue, stop_at, database: str):
     db.db.close()
 
 
-def extract_embeddings(audio_input, database, overlap, audio_speed, fmin, fmax, threads, batchsize, file_output):
-    cfg.MODEL_PATH = cfg.BIRDNET_MODEL_PATH
-    cfg.LABELS_FILE = cfg.BIRDNET_LABELS_FILE
-    cfg.SAMPLE_RATE = cfg.BIRDNET_SAMPLE_RATE
-    cfg.SIG_LENGTH = cfg.BIRDNET_SIG_LENGTH
+def extract_embeddings(audio_input, database, overlap, audio_speed, fmin, fmax, batchsize, file_output):
+    r = model_utils.get_embeddings(
+        audio_input, version="2.4", batch_size=batchsize, overlap_duration_s=overlap, bandpass_fmin=fmin, bandpass_fmax=fmax, speed=audio_speed
+    )
+    for embedding in r.embeddings:
+        consume_embedding()
 
-    # Set input and output path
-    cfg.INPUT_PATH = audio_input
+    # if cfg.CPU_THREADS < 2:
+    #     # Force single core
+    #     batchsize = COMMIT_BS_SIZE
+    #     batch = 0
+    #     db = get_or_create_database(database)
+    #     check_database_settings(db)
 
-    # Parse input files
-    if os.path.isdir(cfg.INPUT_PATH):
-        cfg.FILE_LIST = utils.collect_audio_files(cfg.INPUT_PATH)
-    else:
-        cfg.FILE_LIST = [cfg.INPUT_PATH]
+    #     for fpath, config in tqdm(flist, desc="Files processed"):
+    #         for _, s_start, s_end, embeddings in analyze_file_core(fpath, config):
+    #             if consume_embedding(fpath, s_start, s_end, embeddings, db):
+    #                 batch += 1
 
-    # Set overlap
-    cfg.SIG_OVERLAP = max(0.0, min(2.9, float(overlap)))
+    #             if batch >= batchsize:
+    #                 db.commit()
+    #                 batch = 0
 
-    # Set audio speed
-    cfg.AUDIO_SPEED = max(0.01, audio_speed)
+    #     db.commit()
+    #     db.db.close()
+    # else:
+    #     chunksize = 2
+    #     queue = mp.Queue(maxsize=10_000)
+    #     consumer_process = mp.Process(target=consumer, args=(queue, "STOP", database))
+    #     consumer_process.start()
 
-    # Set bandpass frequency range
-    cfg.BANDPASS_FMIN = max(0, min(cfg.SIG_FMAX, int(fmin)))
-    cfg.BANDPASS_FMAX = max(cfg.SIG_FMIN, min(cfg.SIG_FMAX, int(fmax)))
+    #     # One less process for the pool, because we use one extra for the consumer
+    #     with mp.Pool(processes=cfg.CPU_THREADS - 1) as pool:
+    #         delta = chunksize
+    #         processed_files = set()
+    #         with tqdm(total=len(flist), desc="Files processed") as pbar:
+    #             # Instead of chunk_size arg, manual splitting, because this reduces the overhead for the iterable.
+    #             for res in pool.imap_unordered(analyze_file, [flist[i : i + delta] for i in range(0, len(flist), delta)], chunksize=1):
+    #                 num_already_processed = len(processed_files)
+    #                 processed_files.update([r[0] for r in res])
+    #                 delta = len(processed_files) - num_already_processed
+    #                 queue.put(res)
+    #                 pbar.update(delta)
 
-    # Set number of threads
-    if os.path.isdir(cfg.INPUT_PATH):
-        cfg.CPU_THREADS = max(1, int(threads))
-        cfg.TFLITE_THREADS = 1
-    else:
-        cfg.CPU_THREADS = 1
-        cfg.TFLITE_THREADS = max(1, int(threads))
+    #     queue.put([("STOP", 0, 0, None)])
+    #     consumer_process.join()
 
-    # Set batch size
-    cfg.BATCH_SIZE = max(1, int(batchsize))
-
-    # Add config items to each file list entry.
-    # We have to do this for Windows which does not
-    # support fork() and thus each process has to
-    # have its own config. USE LINUX!
-    flist = [(f, cfg.get_config()) for f in cfg.FILE_LIST]
-
-    if cfg.CPU_THREADS < 2:
-        # Force single core
-        batchsize = COMMIT_BS_SIZE
-        batch = 0
-        db = get_or_create_database(database)
-        check_database_settings(db)
-
-        for fpath, config in tqdm(flist, desc="Files processed"):
-            for _, s_start, s_end, embeddings in analyze_file_core(fpath, config):
-                if consume_embedding(fpath, s_start, s_end, embeddings, db):
-                    batch += 1
-
-                if batch >= batchsize:
-                    db.commit()
-                    batch = 0
-
-        db.commit()
-        db.db.close()
-    else:
-        chunksize = 2
-        queue = mp.Queue(maxsize=10_000)
-        consumer_process = mp.Process(target=consumer, args=(queue, "STOP", database))
-        consumer_process.start()
-
-        # One less process for the pool, because we use one extra for the consumer
-        with mp.Pool(processes=cfg.CPU_THREADS - 1) as pool:
-            delta = chunksize
-            processed_files = set()
-            with tqdm(total=len(flist), desc="Files processed") as pbar:
-                # Instead of chunk_size arg, manual splitting, because this reduces the overhead for the iterable.
-                for res in pool.imap_unordered(analyze_file, [flist[i : i + delta] for i in range(0, len(flist), delta)], chunksize=1):
-                    num_already_processed = len(processed_files)
-                    processed_files.update([r[0] for r in res])
-                    delta = len(processed_files) - num_already_processed
-                    queue.put(res)
-                    pbar.update(delta)
-
-        queue.put([("STOP", 0, 0, None)])
-        consumer_process.join()
-
-    if file_output:
-        create_csv_output(file_output, database)
+    # if file_output:
+    #     create_csv_output(file_output, database)

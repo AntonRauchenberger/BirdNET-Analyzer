@@ -1,7 +1,9 @@
 import os
+from functools import partial
 from pathlib import Path
 
 import gradio as gr
+from birdnet.acoustic_models.inference.perf_tracker import AcousticProgressStats
 from birdnet.globals import MODEL_LANGUAGES
 
 import birdnet_analyzer.config as cfg
@@ -11,6 +13,16 @@ from birdnet_analyzer import model
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 ORIGINAL_LABELS_FILE = str(Path(SCRIPT_DIR).parent / cfg.BIRDNET_LABELS_FILE)
 
+foo_counter = 0
+
+def on_progress(update: AcousticProgressStats, progress: gr.Progress):
+    global foo_counter
+
+    progress(foo_counter / 10, desc="FOOOOOOO")
+    print(f"\ncounter: {foo_counter}\n")
+    foo_counter += 1
+    # if progress is not None and update.progress_current and update.progress_total:
+    #     progress((update.progress_current, update.progress_total), total=update.progress_total, unit="files", desc="es war einmal")
 
 def run_analysis(
     input_path: str | None,
@@ -74,11 +86,16 @@ def run_analysis(
         progress: The gradio progress bar.
     """
     import birdnet_analyzer.gui.localization as loc
+    from birdnet_analyzer.analyze import analyze
 
     if progress is not None:
         progress(0, desc=f"{loc.localize('progress-preparing')} ...")
 
-    from birdnet_analyzer.analyze import analyze
+    if species_list_choice == gu._CUSTOM_SPECIES:
+        gu.validate(species_list_file, loc.localize("validation-no-species-list-selected"))
+
+    if fmin is None or fmax is None or fmin < cfg.SIG_FMIN or fmax > cfg.SIG_FMAX or fmin > fmax:
+        raise gr.Error(f"{loc.localize('validation-no-valid-frequency')} [{cfg.SIG_FMIN}, {cfg.SIG_FMAX}]")
 
     locale = locale.lower()
     custom_classifier = custom_classifier_file if selected_model == gu._CUSTOM_CLASSIFIER else None
@@ -116,10 +133,10 @@ def run_analysis(
         top_n=top_n if use_top_n else None,
         output=output_path,
         additional_columns=additional_columns,
-        use_perch=use_perch,
         model="perch" if use_perch else "birdnet",
         birdnet="2.4",
         classifier=custom_classifier,
         cc_species_list=None,  # always default search path in GUI currently
-        _return_only=bool(input_path), # only for single file tab
+        on_update=partial(on_progress, progress=progress) if callable(progress) else None,
+        _return_only=bool(input_path),  # only for single file tab
     )

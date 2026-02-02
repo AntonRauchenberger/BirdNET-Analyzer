@@ -29,4 +29,7 @@ def main():
     if args.use_perch and args.classifier:
         raise ValueError("The --use_perch and --classifier arguments cannot be used together.")
 
-    analyze(**vars(args))
+    analyze_args = vars(args)
+    analyze_args.pop("use_perch")  # handled via model param
+
+    analyze(**analyze_args)

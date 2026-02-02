@@ -130,10 +130,8 @@ USE_NOISE: bool = False
 # 'audacity' denotes a TXT file with the same format as Audacity timeline labels
 # 'csv' denotes a generic CSV file with start, end, species and confidence.
 RESULT_TYPES = Literal["table", "audacity", "kaleidoscope", "csv"]
-# RESULT_TYPES: set[str] | list[str] = {"table"}
 ADDITIONAL_COLUMNS: list[str] | None = None
 OUTPUT_RAVEN_FILENAME: str = "BirdNET_SelectionTable.txt"  # this is for combined Raven selection tables only
-# OUTPUT_RTABLE_FILENAME: str = "BirdNET_RTable.csv"
 OUTPUT_KALEIDOSCOPE_FILENAME: str = "BirdNET_Kaleidoscope.csv"
 OUTPUT_CSV_FILENAME: str = "BirdNET_CombinedTable.csv"
 OUTPUT_AUDACITY_FILENAME: str = "BirdNET_AudacityLabels.txt"
@@ -275,51 +273,3 @@ def set_config(c: dict):
 
 def perch_labels_file():
     return os.path.join(PERCH_V2_MODEL_PATH, "assets", "labels.csv")
-
-
-# from dataclasses import dataclass
-
-
-# @dataclass
-# class BirdNETConfig:
-#     label_language: str
-#     sig_overlap: float
-#     sig_fmin: int
-#     sig_fmax: int
-#     top_n: int | None
-#     batchsize: int
-#     overlap: float
-#     audio_speed: float
-#     apply_sigmoid: bool
-#     confidence_threshold: float
-#     custom_species_list: list[str] | None
-#     custom_classifier: str | None
-
-
-# @dataclass
-# class BirdNETTrainConfig:
-#     sample_crop_mode: str
-#     upsampling_ratio: float
-#     upsampling_mode: str
-#     epochs: int
-#     batch_size: int
-#     val_split: float
-#     learning_rate: float
-#     hidden_units: int
-#     dropout: float
-#     use_mixup: bool
-#     label_smoothing: bool
-#     focal_loss: bool
-#     focal_loss_gamma: float
-#     focal_loss_alpha: float
-#     use_autotune: bool
-#     autotune_trials: int
-#     autotune_executions_per_trial: int
-
-
-# @dataclass
-# class GeoModelConfig:
-#     latitude: float
-#     longitude: float
-#     week: int
-#     location_filter_threshold: float

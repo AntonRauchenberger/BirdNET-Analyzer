@@ -28,8 +28,5 @@ def species(
         It delegates the main processing to the `run` function from `birdnet_analyzer.species.utils`.
     """
     from birdnet_analyzer.species.utils import run
-    from birdnet_analyzer.utils import ensure_model_exists
-
-    ensure_model_exists()
 
     run(output, lat, lon, week, sf_thresh, sortby)

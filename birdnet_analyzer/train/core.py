@@ -70,9 +70,6 @@ def train(
     """
     import birdnet_analyzer.config as cfg
     from birdnet_analyzer.train.utils import train_model
-    from birdnet_analyzer.utils import ensure_model_exists
-
-    ensure_model_exists()
 
     # Config
     cfg.TRAIN_DATA_PATH = audio_input

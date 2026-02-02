@@ -6,7 +6,6 @@ def embeddings(
     audio_speed: float = 1.0,
     fmin: int = 0,
     fmax: int = 15000,
-    threads: int = 8,
     batch_size: int = 1,
     file_output: str | None = None,
 ):
@@ -27,10 +26,6 @@ def embeddings(
     Raises:
         FileNotFoundError: If the input path or database path does not exist.
         ValueError: If any of the parameters are invalid.
-    Note:
-        Ensure that the required model files are downloaded and available before
-        calling this function. The `ensure_model_exists` function is used to
-        verify this.
     Example:
         embeddings(
             "path/to/audio",
@@ -44,10 +39,8 @@ def embeddings(
         )
     """
     from birdnet_analyzer.embeddings.utils import extract_embeddings
-    from birdnet_analyzer.utils import ensure_model_exists
 
-    ensure_model_exists()
-    extract_embeddings(audio_input, database, overlap, audio_speed, fmin, fmax, threads, batch_size, file_output)
+    extract_embeddings(audio_input, database, overlap, audio_speed, fmin, fmax, batch_size, file_output)
 
 
 def try_get_database(db_path: str):
@@ -65,7 +58,7 @@ def try_get_database(db_path: str):
         return None
 
 
-def get_or_create_database(db_path: str):
+def get_or_create_database(db_path: str, embedding_dim: int = 1024):
     """Get the database object. Creates or opens the databse.
     Args:
         db: The path to the database.
@@ -80,9 +73,9 @@ def get_or_create_database(db_path: str):
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         return sqlite_usearch_impl.SQLiteUsearchDB.create(
             db_path=db_path,
-            usearch_cfg=sqlite_usearch_impl.get_default_usearch_config(embedding_dim=1024),  # TODO: dont hardcode this
+            usearch_cfg=sqlite_usearch_impl.get_default_usearch_config(embedding_dim=embedding_dim),
         )
     try:
         return sqlite_usearch_impl.SQLiteUsearchDB.create(db_path=db_path)
     except ValueError:
-        return sqlite_usearch_impl.SQLiteUsearchDB.create(db_path=db_path, usearch_cfg=sqlite_usearch_impl.get_default_usearch_config(embedding_dim=1024))
+        return sqlite_usearch_impl.SQLiteUsearchDB.create(db_path=db_path, usearch_cfg=sqlite_usearch_impl.get_default_usearch_config(embedding_dim=embedding_dim))

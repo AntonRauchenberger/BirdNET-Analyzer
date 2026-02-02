@@ -1,5 +1,12 @@
+from collections.abc import Callable
+
 import birdnet
+from birdnet.acoustic_models.inference.encoding.result import AcousticFileEncodingResult
+from birdnet.acoustic_models.inference.perf_tracker import AcousticProgressStats
+from birdnet.acoustic_models.inference.prediction.result import AcousticFilePredictionResult
 from birdnet.globals import ACOUSTIC_MODEL_VERSIONS, MODEL_LANGUAGES
+
+GLOBAL_PREFETCH_RATIO = 2
 
 
 def run_interference(
@@ -8,7 +15,9 @@ def run_interference(
     version: ACOUSTIC_MODEL_VERSIONS = "2.4",
     top_k: int | None = 5,
     batch_size=1,
-    prefetch_ratio=2,
+    n_workers: int | None = None,
+    n_producers: int = 1,
+    prefetch_ratio=GLOBAL_PREFETCH_RATIO,
     overlap_duration_s=0.0,
     bandpass_fmin=0,
     bandpass_fmax=15_000,
@@ -19,8 +28,8 @@ def run_interference(
     label_language: MODEL_LANGUAGES = "en_us",
     classifier: str | None = None,
     cc_species_list: str | None = None,
-    callback=None,
-):
+    callback: Callable[[AcousticProgressStats], None] | None = None,
+) -> AcousticFilePredictionResult:
     if classifier:
         if not cc_species_list:
             cc_species_list = classifier.replace(".tflite", "_Labels.txt", 1)
@@ -44,9 +53,40 @@ def run_interference(
         default_confidence_threshold=min_confidence,
         custom_species_list=custom_species_list,
         progress_callback=callback,
+        show_stats="progress",
+        n_workers=n_workers,
+        n_feeders=n_producers,
     )
 
 
 def run_geomodel(lat, lon, week=None, language: MODEL_LANGUAGES = "en_us", threshold: float = 0.03):
     model = birdnet.load("geo", "2.4", "tf", lang=language)
     return model.predict(lat, lon, week=week, min_confidence=threshold)
+
+
+def get_embeddings(
+    path: str,
+    version: ACOUSTIC_MODEL_VERSIONS = "2.4",
+    batch_size=1,
+    n_workers: int | None = None,
+    n_producers: int = 1,
+    prefetch_ratio=GLOBAL_PREFETCH_RATIO,
+    overlap_duration_s=0.0,
+    bandpass_fmin=0,
+    bandpass_fmax=15_000,
+    speed=1.0,
+    callback: Callable[[AcousticProgressStats], None] | None = None,
+) -> AcousticFileEncodingResult:
+    model = birdnet.load("acoustic", version, "tf")
+    return model.encode(
+        path,
+        batch_size=batch_size,
+        prefetch_ratio=prefetch_ratio,
+        overlap_duration_s=overlap_duration_s,
+        bandpass_fmin=bandpass_fmin,
+        bandpass_fmax=bandpass_fmax,
+        speed=speed,
+        progress_callback=callback,
+        n_workers=n_workers,
+        n_feeders=n_producers,
+    )

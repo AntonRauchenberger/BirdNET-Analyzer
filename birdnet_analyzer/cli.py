@@ -39,7 +39,7 @@ ASCII_LOGO = r"""
 
 def store_model_action(model_name: str):
     class StoreModelAction(argparse.Action):
-        def __init__(self, option_strings, dest, default=False, required=False, help=None):
+        def __init__(self, option_strings, dest, default=False, required=False, help=None):  # noqa: A002
             super().__init__(option_strings=option_strings, dest=dest, nargs=0, const=True, default=default, required=required, help=help)
 
         def __call__(self, parser, namespace, values, option_string=None):
@@ -320,13 +320,40 @@ def bs_args(default=cfg.BATCH_SIZE):
     return p
 
 
+def computing_resources_args():
+    """
+    Creates an argument parser for computing resource configuration.
+    Notes:
+        The parser includes the following arguments:
+        --n_workers: Number of worker processes for audio processing. Defaults to number of CPU cores.
+        --n_producers: Number of producer processes for audio processing. Defaults to 1.
+    Returns:
+        argparse.ArgumentParser: An argument parser with arguments for worker and producer processes.
+    """
+    p = argparse.ArgumentParser(add_help=False)
+    p.add_argument(
+        "--n_workers",
+        type=int,
+        help="Number of worker processes for audio processing. Defaults to number of CPU cores.",
+    )
+    p.add_argument(
+        "--n_producers",
+        type=int,
+        default=1,
+        help="Number of producer processes for audio processing. Defaults to 1.",
+    )
+
+    return p
+
+
 def db_args():
     """
     Creates an arguments parser for the database path.
+    Notes:
+        The parser includes the following argument:
+        -db, --database: Path to the database folder.
     Returns:
         argparse.ArgumentParser: An argument parser with a database size argument.
-    The parser includes the following argument:
-        -db, --database: Path to the database folder.
     """
     p = argparse.ArgumentParser(add_help=False)
     p.add_argument(
@@ -359,7 +386,7 @@ def analyzer_parser():
     Returns:
         argparse.ArgumentParser: Configured argument parser for the BirdNET Analyzer CLI.
     """
-    from birdnet_analyzer.analyze import POSSIBLE_ADDITIONAL_COLUMNS_MAP
+    from birdnet_analyzer.analyze import POSSIBLE_ADDITIONAL_COLUMNS
 
     parents = [
         birdnet_arg(),
@@ -372,6 +399,7 @@ def analyzer_parser():
         min_conf_args(),
         locale_args(),
         bs_args(),
+        computing_resources_args(),
     ]
 
     parser = argparse.ArgumentParser(
@@ -393,10 +421,9 @@ def analyzer_parser():
     )
     parser.add_argument(
         "--additional_columns",
-        choices=POSSIBLE_ADDITIONAL_COLUMNS_MAP.keys(),
+        choices=POSSIBLE_ADDITIONAL_COLUMNS,
         nargs="+",
-        help="Additional columns to include in the output, only applied to the csv output format. "
-        + f"Values in [{','.join(POSSIBLE_ADDITIONAL_COLUMNS_MAP.keys())}].",
+        help="Additional columns to include in the output, only applied to the csv output format.",
         action=UniqueSetAction,
     )
     parser.add_argument(
@@ -415,12 +442,6 @@ def analyzer_parser():
     parser.add_argument(
         "--cc_species_list",
         help="Path to custom species list file for the custom classifier. The default search path is <custom_classifier_without_extension>_Labels.txt in the same directory.",
-    )
-
-    parser.add_argument(
-        "--skip_existing_results",
-        action="store_true",
-        help="Skip files that have already been analyzed.",
     )
 
     parser.add_argument(
@@ -452,14 +473,14 @@ def embeddings_parser():
     - bandpass_args(): Handles bandpass filter arguments.
     - audio_speed_args(): Handles audio speed arguments.
     - overlap_args(): Handles overlap arguments.
-    - threads_args(): Handles threading arguments.
+    - computing_resources_args(): Handles computing resource arguments.
     - bs_args(): Handles batch size arguments.
 
     Returns:
         argparse.ArgumentParser: Configured argument parser for extracting feature embeddings.
     """
 
-    parents = [db_args(), bandpass_args(), audio_speed_args(), overlap_args(), threads_args(), bs_args(default=8)]
+    parents = [db_args(), bandpass_args(), audio_speed_args(), overlap_args(), bs_args(default=8), computing_resources_args()]
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,

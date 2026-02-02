@@ -1,13 +1,17 @@
-from collections.abc import Collection
+from __future__ import annotations
+
+import os
+from math import isclose
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from birdnet.globals import ACOUSTIC_MODEL_VERSIONS, MODEL_LANGUAGES
-
-from birdnet_analyzer.config import RESULT_TYPES
-
 if TYPE_CHECKING:
-    from birdnet.acoustic_models.inference.scores import PredictionResultBase
+    from collections.abc import Collection
+
+    import pandas as pd
+    from birdnet.globals import ACOUSTIC_MODEL_VERSIONS, MODEL_LANGUAGES
+
+    from birdnet_analyzer.config import RESULT_TYPES
 
 
 def analyze(
@@ -29,6 +33,8 @@ def analyze(
     fmax: int = 15000,
     audio_speed: float = 1.0,
     batch_size: int = 1,
+    n_workers: int | None = None,
+    n_producers: int = 1,
     combine_results: bool = False,  # TODO: aktuell useless, ist inzwischen der default
     rtype: RESULT_TYPES | list[RESULT_TYPES] = "table",
     skip_existing_results: bool = False,  # TODO: aktuell useless, müsste man nochmal ganz neu implementieren, basierend auf den files in einem resultfile
@@ -37,7 +43,7 @@ def analyze(
     merge_consecutive: int = 1,  # TODO: aktuell useless, muss wahrscheinlich manuell mit pandas gemacht werden
     locale: MODEL_LANGUAGES = "en_us",
     additional_columns: list[str] | None = None,
-    use_perch: bool = False,  # TODO: aktuell useless, kann eigentlich weg, weil model param
+    on_update=None,
     _return_only=False,
 ):
     """
@@ -77,16 +83,9 @@ def analyze(
         - Results can be combined into a single file if `combine_results` is True.
         - Analysis parameters are saved to a file in the output directory.
     """
-    from functools import partial
-
     import birdnet_analyzer.config as cfg
-    from birdnet_analyzer.analyze.utils import load_codes
     from birdnet_analyzer.model_utils import run_geomodel, run_interference
     from birdnet_analyzer.utils import save_params
-
-    # handled in bibo
-    # if (lat is not None and lon is None) or (lat is None and lon is not None):
-    #     raise ValueError("Both latitude and longitude must be provided for location-based filtering.")
 
     species_list_file = slist if isinstance(slist, (str, Path)) else ""
 
@@ -113,6 +112,9 @@ def analyze(
         classifier=classifier,
         cc_species_list=cc_species_list,
         version=birdnet,
+        callback=on_update,
+        n_workers=n_workers,
+        n_producers=n_producers,
     )
 
     if _return_only:
@@ -120,94 +122,187 @@ def analyze(
 
     output: Path = Path(audio_input).parent if Path(audio_input).is_file() else Path(audio_input)
 
+    df = predictions.to_dataframe()
+    # df = _merge_consecutive_segments(df, merge_consecutive, hop_size=predictions.hop_duration_s)
+
+    df = _merge_consecutive_segments(df, merge_consecutive, hop_size=3.0)
+
     if "table" in rtype:
-        save_as_rtable(predictions, fmin, fmax, output / cfg.OUTPUT_RAVEN_FILENAME)
+        save_as_rtable(df, fmin, fmax, predictions.model_fmin, predictions.model_fmax, audio_speed, output / cfg.OUTPUT_RAVEN_FILENAME)
 
     if "csv" in rtype:
         save_as_csv(
-            predictions,
+            df,
             output / cfg.OUTPUT_CSV_FILENAME,
             additional_columns,
-            lat,
-            lon,
-            week,
-            overlap,
-            min_conf,
-            sensitivity,
-            species_list_file,
+            lat=lat,
+            lon=lon,
+            week=week,
+            overlap=overlap,
+            min_conf=min_conf,
+            sensitivity=sensitivity,
+            species_list_file=species_list_file,
+            model_path=predictions.model_path,
         )
 
     if "kaleidoscope" in rtype:
         save_as_kaleidoscope(
-            predictions,
+            df,
             output / cfg.OUTPUT_KALEIDOSCOPE_FILENAME,
             overlap,
             sensitivity,
-            lat,
-            lon,
-            week,
+            lat=lat,
+            lon=lon,
+            week=week,
         )
 
-    # TODO: Verwendet jemand das??
     if "audacity" in rtype:
         save_as_audacity(
-            predictions,
+            df,
             output / cfg.OUTPUT_AUDACITY_FILENAME,
         )
 
     save_params(
         output / cfg.ANALYSIS_PARAMS_FILENAME,
         (
-            # "File splitting duration", # TODO: prediction metadata
-            # "Segment length", # TODO: prediciont metadata
-            # "Sample rate", # TODO: prediction metadata
+            "Segment length",
+            "Sample rate",
             "Segment overlap",
-            # "Minimum Segment length", # TODO: prediction metadata
             "Bandpass filter minimum",
             "Bandpass filter maximum",
-            # "Merge consecutive detections", #TODO: aktuell useless
+            "Merge consecutive detections",
             "Audio speed",
             "Custom classifier path",
         ),
         (
-            # cfg.FILE_SPLITTING_DURATION,
-            # cfg.SIG_LENGTH,
-            # cfg.SAMPLE_RATE,
+            predictions.segment_duration_s,
+            predictions.model_sr,
             overlap,
-            # cfg.SIG_MINLEN,
             fmin,
             fmax,
-            # cfg.MERGE_CONSECUTIVE,
+            merge_consecutive,
             audio_speed,
             classifier if classifier else "",
         ),
     )
 
-    return None
+    return predictions
 
 
-def save_as_rtable(predictions, fmin, fmax, outfile: Path):
+def _merge_consecutive_segments(df: pd.DataFrame, merge_consecutive: int, hop_size: float = 3.0) -> pd.DataFrame:
+    """
+    Merge consecutive prediction segments for the same input and species.
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input predictions containing at least "input", "species_name", "start_time",
+        "end_time" and "confidence".
+    merge_consecutive : int
+        Number of consecutive rows that must be contiguous to merge them.
+    hop_size : float, optional
+        Allowed tolerance (in seconds) between the end of one segment and the start of
+        the next to consider them consecutive, by default 3.0.
+    Returns
+    -------
+    pandas.DataFrame
+        Merged prediction segments, with continuous ranges collapsed and the
+        confidence averaged when available. Raises ValueError when required columns
+        are missing or time columns are non-numeric.
+    """
+    import pandas as pd
+
+    if merge_consecutive <= 1:
+        return df
+
+    if df.empty:
+        return df
+
+    required_cols = {"input", "species_name", "start_time", "end_time"}
+
+    if not required_cols.issubset(set(df.columns)):
+        raise ValueError(f"DataFrame is badly formed, missing required columns: {required_cols - set(df.columns)}")
+
+    df = df.copy()
+
+    try:
+        # time columns can be float16, which cannot be sorted by pandas
+        df["start_time"] = df["start_time"].astype("float32", copy=False)
+        df["end_time"] = df["end_time"].astype("float32", copy=False)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Time columns must be numeric.") from exc
+
+    df_sorted = df.sort_values(by=["input", "species_name", "start_time", "end_time"]).reset_index(drop=True)
+    merged_records = []
+    i = 0
+
+    while i < len(df_sorted):
+        window = [df_sorted.iloc[i]]
+
+        while len(window) < merge_consecutive:
+            next_idx = i + len(window)
+            if next_idx >= len(df_sorted):
+                break
+
+            prev_row = window[-1]
+            candidate_row = df_sorted.iloc[next_idx]
+
+            if (
+                candidate_row["input"] == prev_row["input"]
+                and candidate_row["species_name"] == prev_row["species_name"]
+                and isclose(float(candidate_row["start_time"]), float(prev_row["end_time"]), abs_tol=hop_size)
+            ):
+                window.append(candidate_row)
+            else:
+                break
+
+        if len(window) == merge_consecutive:
+            merged_row = window[0].copy()
+            merged_row["start_time"] = window[0]["start_time"]
+            merged_row["end_time"] = window[-1]["end_time"]
+
+            if "confidence" in df.columns:
+                confidences = [float(row["confidence"]) for row in window]
+                avg_confidence = sum(confidences) / len(confidences)
+                confidence_type = type(window[0]["confidence"])
+
+                try:
+                    merged_row["confidence"] = confidence_type(avg_confidence)
+                except (TypeError, ValueError):
+                    merged_row["confidence"] = avg_confidence
+
+            merged_records.append(merged_row.to_dict())
+            i += merge_consecutive
+        else:
+            merged_records.append(window[0].to_dict())
+            i += 1
+
+    merged_df = pd.DataFrame.from_records(merged_records, columns=df.columns)
+    merged_df.sort_values(by=["input", "start_time", "end_time", "species_name"], inplace=True)
+
+    return merged_df
+
+
+def save_as_rtable(df: pd.DataFrame, bandpass_fmin, bandpass_fmax, model_fmin, model_fmax, audio_speed, outfile: Path):
+    from functools import partial
+
     from birdnet_analyzer.analyze.utils import load_codes
+    from birdnet_analyzer.audio import get_audio_info
 
-    def read_high_freq(file_path, sig_fmax, bandpass_fmax, audio_speed):
-        # TODO: is all of this REALLY necessary??
-        from birdnet_analyzer.audio import get_sample_rate
-
-        high_freq = get_sample_rate(file_path) / 2
+    def read_high_freq(file_path, sig_fmax, bandpass_fmax, audio_speed, file_infos):
+        high_freq = file_infos[file_path]["samplerate"] / 2
         high_freq = min(high_freq, int(sig_fmax / audio_speed))
         return int(min(high_freq, int(bandpass_fmax / audio_speed)))
 
     codes = load_codes()
-    df = predictions.to_dataframe()
+    files = df["input"].unique()
+    file_infos = {file: get_audio_info(file) for file in files}
+
     n_rows = df.shape[0]
     df["Selection"] = list(range(1, n_rows + 1))
     df["View"] = ["Spectrogram 1"] * n_rows
     df["Channel"] = [1] * n_rows
-    df["Low Freq (Hz)"] = [fmin] * n_rows
-    df["High Freq (Hz)"] = [fmax] * n_rows
-    # TODO: mach ich wenn Stefan es als metadaten im result mitgibt
-    # df["High Freq (Hz)"] = df["input"].map(partial(read_high_freq, sig_fmax=predictions.sig_fmax, bandpass_fmax=fmax, audio_speed=audio_speed))
-    # df["Low Freq (Hz)"] = [max(predictions.sig_fmin, int(fmin / audio_speed))] * n_rows
+    df["High Freq (Hz)"] = df["input"].map(partial(read_high_freq, sig_fmax=model_fmax, bandpass_fmax=bandpass_fmax, audio_speed=audio_speed, file_infos=file_infos))
+    df["Low Freq (Hz)"] = [max(model_fmin, int(bandpass_fmin / audio_speed))] * n_rows
     df["File Offset (s)"] = df["start_time"]
     df[["Scientific Name", "Common Name"]] = df["species_name"].str.split("_", n=1, expand=True)
     df["Species Code"] = df["Scientific Name"].map(lambda x: codes.get(str(x), str(x)))
@@ -216,6 +311,21 @@ def save_as_rtable(predictions, fmin, fmax, outfile: Path):
         columns={"start_time": "Begin Time (s)", "end_time": "End Time (s)", "input": "Begin Path", "confidence": "Confidence"},
         inplace=True,
     )
+
+    acumulated_start_times = []
+    accumulated_end_times = []
+    accumulated_time = 0.0
+    current_file = df["Begin Path"].iloc[0]
+
+    for row in df.iterrows():
+        file = row[1]["Begin Path"]
+
+        if file != current_file:
+            accumulated_time += file_infos[current_file]["duration"]
+            current_file = file
+
+        acumulated_start_times.append(row[1]["Begin Time (s)"] + accumulated_time)
+        accumulated_end_times.append(row[1]["End Time (s)"] + accumulated_time)
 
     # Reordering
     cols = [
@@ -228,17 +338,20 @@ def save_as_rtable(predictions, fmin, fmax, outfile: Path):
         "Confidence",
         "View",
         "Channel",
+        "File Offset (s)",
         "Low Freq (Hz)",
         "High Freq (Hz)",
         "Begin Path",
     ]
-    # TODO: still missing "File Offset (s)"
+
     df = df[cols]
+    df["Begin Time (s)"] = acumulated_start_times
+    df["End Time (s)"] = accumulated_end_times
     df.to_csv(outfile, sep="\t", index=False)
 
 
 def save_as_csv(
-    predictions,
+    df: pd.DataFrame,
     output: Path,
     additional_columns: list[str] | None = None,
     lat=None,
@@ -248,8 +361,8 @@ def save_as_csv(
     min_conf=None,
     sensitivity=None,
     species_list_file=None,
+    model_path=None,
 ):
-    df = predictions.to_dataframe()
     n_rows = df.shape[0]
 
     if additional_columns:
@@ -261,7 +374,7 @@ def save_as_csv(
             "sensitivity": sensitivity,
             "min_conf": min_conf,
             "species_list": species_list_file,
-            # "model": os.path.basename(cfg.MODEL_PATH), # TODO: am besten aus den prediction metadaten
+            "model": os.path.basename(model_path or ""),
         }
         for col in possible_cols:
             if col in additional_columns:
@@ -281,8 +394,7 @@ def save_as_csv(
     df.to_csv(output, index=False)
 
 
-def save_as_kaleidoscope(predictions, output: Path, overlap, sensitivity, lat=None, lon=None, week=None):
-    df = predictions.to_dataframe()
+def save_as_kaleidoscope(df: pd.DataFrame, output: Path, overlap, sensitivity, lat=None, lon=None, week=None):
     n_rows = df.shape[0]
     df["INDIR"] = df["input"].map(lambda x: str(Path(x).parent.parent).rstrip("/"))
     df["FOLDER"] = df["input"].map(lambda x: Path(x).parent.name)
@@ -306,9 +418,7 @@ def save_as_kaleidoscope(predictions, output: Path, overlap, sensitivity, lat=No
     df.to_csv(output, index=False)
 
 
-def save_as_audacity(predictions, output: Path):
-    df = predictions.to_dataframe()
-
+def save_as_audacity(df: pd.DataFrame, output: Path):
     df = df[["start_time", "end_time", "species_name", "confidence"]]
 
     df.to_csv(output, index=False, header=False, sep="\t")

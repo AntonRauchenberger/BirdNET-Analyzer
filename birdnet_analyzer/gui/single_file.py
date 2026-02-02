@@ -44,13 +44,7 @@ def run_single_file_analysis(
 
     from birdnet_analyzer.gui.analysis import run_analysis
 
-    if species_list_choice == gu._CUSTOM_SPECIES:
-        gu.validate(species_list_file, loc.localize("validation-no-species-list-selected"))
-
     gu.validate(input_path, loc.localize("validation-no-file-selected"))
-
-    if fmin is None or fmax is None or fmin < cfg.SIG_FMIN or fmax > cfg.SIG_FMAX or fmin > fmax:
-        raise gr.Error(f"{loc.localize('validation-no-valid-frequency')} [{cfg.SIG_FMIN}, {cfg.SIG_FMAX}]")
 
     predictions = run_analysis(
         input_path=input_path,

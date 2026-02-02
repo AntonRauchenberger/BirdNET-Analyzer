@@ -70,7 +70,6 @@ def run_embeddings(
             settings["AUDIO_SPEED"],
             settings["BANDPASS_FMIN"],
             settings["BANDPASS_FMAX"],
-            threads,
             batch_size,
             file_output,
         )
@@ -82,7 +81,7 @@ def run_embeddings(
         if fmin is None or fmax is None or fmin < cfg.SIG_FMIN or fmax > cfg.SIG_FMAX or fmin > fmax:
             raise gr.Error(f"{loc.localize('validation-no-valid-frequency')} [{cfg.SIG_FMIN}, {cfg.SIG_FMAX}]") from e
 
-        extract_embeddings(input_path, db_directory, overlap, audio_speed, fmin, fmax, threads, batch_size, file_output)
+        extract_embeddings(input_path, db_directory, overlap, audio_speed, fmin, fmax, batch_size, file_output)
 
     gr.Info(f"{loc.localize('embeddings-tab-finish-info')} {db_directory}")
 

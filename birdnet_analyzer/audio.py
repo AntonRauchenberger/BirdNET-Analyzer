@@ -29,9 +29,7 @@ def open_audio_file(path: str, sample_rate=48000, offset=0.0, duration=None, fmi
     """
     # Open file with librosa (uses ffmpeg or libav)
     if speed == 1.0:
-        sig, rate = librosa.load(
-            path, sr=sample_rate, offset=offset, duration=duration, mono=True, res_type="kaiser_fast"
-        )
+        sig, rate = librosa.load(path, sr=sample_rate, offset=offset, duration=duration, mono=True, res_type="kaiser_fast")
 
     else:
         # Load audio with original sample rate
@@ -47,6 +45,24 @@ def open_audio_file(path: str, sample_rate=48000, offset=0.0, duration=None, fmi
         # sig = bandpassKaiserFIR(sig, rate, fmin, fmax)
 
     return sig, rate
+
+
+def get_audio_info(path):
+    """
+    Get basic information about an audio file.
+
+    Args:
+        path (str): The file path to the audio file.
+
+    Returns:
+        dict: A dictionary containing audio file information such as sample rate, channels, duration, etc.
+    """
+    info = sf.info(path)
+
+    return {
+        "samplerate": info.samplerate,
+        "duration": info.duration,
+    }
 
 
 def get_audio_file_length(path):

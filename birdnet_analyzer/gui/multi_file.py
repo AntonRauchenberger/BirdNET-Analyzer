@@ -1,4 +1,5 @@
 import gradio as gr
+from birdnet.globals import MODEL_LANGUAGE_EN_US
 
 import birdnet_analyzer.config as cfg
 import birdnet_analyzer.gui.localization as loc
@@ -51,68 +52,53 @@ def run_batch_analysis(
     threads,
     input_dir,
     skip_existing,
-    progress=gr.Progress(track_tqdm=True),
+    progress=gr.Progress(),
 ):
     from birdnet_analyzer.gui.analysis import run_analysis
 
     gu.validate(input_dir, loc.localize("validation-no-directory-selected"))
-    batch_size = int(batch_size)
-    threads = int(threads)
-
-    if species_list_choice == gu._CUSTOM_SPECIES:
-        gu.validate(species_list_file, loc.localize("validation-no-species-list-selected"))
-
-    if fmin is None or fmax is None or fmin < cfg.SIG_FMIN or fmax > cfg.SIG_FMAX or fmin > fmax:
-        raise gr.Error(f"{loc.localize('validation-no-valid-frequency')} [{cfg.SIG_FMIN}, {cfg.SIG_FMAX}]")
 
     results = run_analysis(
-        None,
-        output_path,
-        use_top_n,
-        top_n,
-        confidence,
-        sensitivity,
-        overlap,
-        merge_consecutive,
-        audio_speed,
-        fmin,
-        fmax,
-        species_list_choice,
-        species_list_file,
-        lat,
-        lon,
-        week,
-        use_yearlong,
-        sf_thresh,
-        selected_model,
-        custom_classifier_file,
-        output_type,
-        additional_columns,
-        combine_tables,
-        locale if locale else "en",
-        batch_size if batch_size and batch_size > 0 else 1,
-        threads if threads and threads > 0 else 4,
-        input_dir,
-        skip_existing,
-        True,
-        progress,
+        input_path=None,
+        output_path=output_path,
+        use_top_n=use_top_n,
+        top_n=top_n,
+        confidence=confidence,
+        sensitivity=sensitivity,
+        overlap=overlap,
+        merge_consecutive=merge_consecutive,
+        audio_speed=audio_speed,
+        fmin=fmin,
+        fmax=fmax,
+        species_list_choice=species_list_choice,
+        species_list_file=species_list_file,
+        lat=lat,
+        lon=lon,
+        week=week,
+        use_yearlong=use_yearlong,
+        sf_thresh=sf_thresh,
+        selected_model=selected_model,
+        custom_classifier_file=custom_classifier_file,
+        output_types=output_type,
+        additional_columns=additional_columns,
+        combine_tables=combine_tables,
+        locale=locale if locale else MODEL_LANGUAGE_EN_US,
+        batch_size=batch_size if batch_size and batch_size > 0 else 1,
+        threads=None, # TODO: nr_worker exposen
+        input_dir=input_dir,
+        skip_existing=skip_existing,
+        save_params=True,
+        progress=progress,
     )
 
-    def map_to_reason(result):
-        match result:
-            case "NoBackendError":
-                return loc.localize("multi-tab-file-error-nobackend")
-            case _:
-                return result
-
-    skipped_files = [[path, map_to_reason(successful)] for path, successful in results if isinstance(successful, str)]
+    skipped_files = [[results.inputs[ui]] for ui in results.unprocessable_inputs]
     header = (
-        [loc.localize("multi-tab-result-dataframe-column-invalid-file-header"), loc.localize("multi-tab-result-dataframe-column-reason-header")]
+        [loc.localize("multi-tab-result-dataframe-column-invalid-file-header")]
         if skipped_files
         else [loc.localize("multi-tab-result-dataframe-column-success-header")]
     )
 
-    return gr.update(value=skipped_files, headers=header, col_count=2 if skipped_files else 1, elem_classes=None if skipped_files else "success")
+    return gr.update(value=skipped_files, headers=header, elem_classes=None if skipped_files else "success")
 
 
 def build_multi_analysis_tab():
@@ -131,13 +117,13 @@ def build_multi_analysis_tab():
                     ],
                 )
 
-                def select_directory_on_empty():  # Nishant - Function modified for For Folder selection
+                def select_directory_on_empty():
                     folder = gu.select_folder(state_key="batch-analysis-data-dir")
 
                     if folder:
                         files_and_durations = gu.get_audio_files_and_durations(folder)
                         if len(files_and_durations) > 100:
-                            return [folder, [*files_and_durations[:100], ("...", "...")]]  # hopefully fixes issue#272
+                            return [folder, [*files_and_durations[:100], ("...", "...")]]
                         return [folder, files_and_durations]
 
                     return ["", [[loc.localize("multi-tab-samples-dataframe-no-files-found")]]]
@@ -152,7 +138,7 @@ def build_multi_analysis_tab():
                     placeholder=loc.localize("multi-tab-output-textbox-placeholder"),
                 )
 
-                def select_directory_wrapper():  # Nishant - Function modified for For Folder selection
+                def select_directory_wrapper():
                     folder = gu.select_folder(state_key="batch-analysis-output-dir")
                     return (folder, folder) if folder else ("", "")
 

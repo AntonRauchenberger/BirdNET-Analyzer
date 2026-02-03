@@ -15,7 +15,7 @@ RNG = np.random.default_rng(cfg.RANDOM_SEED)
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 
 
-def detect_rtype(line: str):
+def _detect_rtypee(line: str):
     """Detects the type of result file.
 
     Args:
@@ -36,7 +36,7 @@ def detect_rtype(line: str):
     return "audacity"
 
 
-def get_header_mapping(line: str) -> dict:
+def _get_header_mapping(line: str) -> dict:
     """
     Parses a header line and returns a mapping of column names to their indices.
 
@@ -46,7 +46,7 @@ def get_header_mapping(line: str) -> dict:
     Returns:
         dict: A dictionary where the keys are column names and the values are their respective indices.
     """
-    rtype = detect_rtype(line)
+    rtype = _detect_rtypee(line)
 
     sep = "\t" if rtype in ("table", "audacity") else ","
 
@@ -72,9 +72,7 @@ def parse_folders(apath: str, rpath: str, allowed_result_filetypes: tuple[str, .
     apath = apath.replace("/", os.sep).replace("\\", os.sep)
     rpath = rpath.replace("/", os.sep).replace("\\", os.sep)
 
-    # Check if combined selection table is present and read that.
     if os.path.exists(os.path.join(rpath, cfg.OUTPUT_RAVEN_FILENAME)):
-        # Read combined Raven selection table
         rfile = os.path.join(rpath, cfg.OUTPUT_RAVEN_FILENAME)
         data["combined"] = {"isCombinedFile": True, "result": rfile}
     elif os.path.exists(os.path.join(rpath, cfg.OUTPUT_CSV_FILENAME)):
@@ -84,14 +82,12 @@ def parse_folders(apath: str, rpath: str, allowed_result_filetypes: tuple[str, .
         rfile = os.path.join(rpath, cfg.OUTPUT_KALEIDOSCOPE_FILENAME)
         data["combined"] = {"isCombinedFile": True, "result": rfile}
     else:
-        # Get all audio files
         for root, _, files in os.walk(apath):
             for f in files:
                 if f.rsplit(".", 1)[-1].lower() in cfg.ALLOWED_FILETYPES and not f.startswith("."):
                     table_key = os.path.join(root.strip(apath), f.rsplit(".", 1)[0])
                     data[table_key] = {"audio": os.path.join(root, f), "result": ""}
 
-        # Get all result files
         for root, _, files in os.walk(rpath):
             for f in files:
                 if f.rsplit(".", 1)[-1] in allowed_result_filetypes and ".BirdNET." in f:
@@ -99,7 +95,6 @@ def parse_folders(apath: str, rpath: str, allowed_result_filetypes: tuple[str, .
                     if table_key in data:
                         data[table_key]["result"] = os.path.join(root, f)
 
-    # Convert to list
     flist = [f for f in data.values() if f["result"]]
 
     print(f"Found {len(flist)} audio files with valid result file.")
@@ -107,7 +102,7 @@ def parse_folders(apath: str, rpath: str, allowed_result_filetypes: tuple[str, .
     return flist
 
 
-def parse_files(flist: list[dict], max_segments=100, collection_mode = "random") -> list[tuple[str, list]]:
+def parse_files(flist: list[dict], max_segments=100, collection_mode="random", n_bins=10, min_conf=0.25, max_conf=1.0) -> list[tuple[str, list]]:
     """
     Parses a list of files to extract and organize bird call segments by species.
 
@@ -116,8 +111,10 @@ def parse_files(flist: list[dict], max_segments=100, collection_mode = "random")
                             Optionally, a dictionary can have 'isCombinedFile' set to True to indicate
                             that it is a combined result file.
         max_segments (int, optional): The maximum number of segments to retain per species. Defaults to 100.
-    Returns:
-        list[tuple]: A list of tuples where each tuple contains an audio file path and a list of segments
+        collection_mode (str, optional): The mode to collect segments. Can be "random", "confidence", or "balanced". Defaults to "random".
+        n_bins (int, optional): Number of bins to use when collection_mode is "balanced". Defaults to 10.
+        min_conf (float, optional): Minimum confidence threshold for segments to be considered. Defaults to 0.25.
+        max_conf (float, optional): Maximum confidence threshold for segments to be considered. Defaults to 1.0.
                      associated with that audio file.
     Raises:
         KeyError: If the dictionaries in flist do not contain the required keys ('audio' and 'result').
@@ -129,14 +126,12 @@ def parse_files(flist: list[dict], max_segments=100, collection_mode = "random")
         segments = parseFiles(flist, max_segments=50)
     """
     species_segments: dict[str, list] = {}
-
     is_combined_rfile = len(flist) == 1 and flist[0].get("isCombinedFile", False)
 
     if is_combined_rfile:
         rfile = flist[0]["result"]
-        segments = find_segments_from_combined(rfile)
+        segments = _find_segments_from_combined(rfile, min_conf=min_conf)
 
-        # Parse segments by species
         for s in segments:
             if s["species"] not in species_segments:
                 species_segments[s["species"]] = []
@@ -144,21 +139,17 @@ def parse_files(flist: list[dict], max_segments=100, collection_mode = "random")
             species_segments[s["species"]].append(s)
     else:
         for f in flist:
-            # Paths
             afile = f["audio"]
             rfile = f["result"]
 
-            # Get all segments for result file
-            segments = find_segments(afile, rfile)
+            segments = _find_segments(afile, rfile, min_conf=min_conf)
 
-            # Parse segments by species
             for s in segments:
                 if s["species"] not in species_segments:
                     species_segments[s["species"]] = []
 
                 species_segments[s["species"]].append(s)
 
-    # Shuffle segments for each species and limit to max_segments
     for s in species_segments:
         if collection_mode == "random":
             RNG.shuffle(species_segments[s])
@@ -167,42 +158,36 @@ def parse_files(flist: list[dict], max_segments=100, collection_mode = "random")
             species_segments[s].sort(key=lambda x: x["confidence"], reverse=True)
             species_segments[s] = species_segments[s][:max_segments]
         elif collection_mode == "balanced":
-            # Calculate confidence bins betwenn min and max confidence
             confidence_bins = []
-            bin_threshholds = np.linspace(cfg.MIN_CONFIDENCE, cfg.MAX_CONFIDENCE, num=cfg.BALANCED_COLLECTION_BINS)
+            bin_threshholds = np.linspace(min_conf, max_conf, num=n_bins)
+
             for i in range(len(bin_threshholds)):
                 if i == 0:
                     confidence_bins.append((0, bin_threshholds[i]))
                 else:
-                    confidence_bins.append((bin_threshholds[i-1], bin_threshholds[i]))
+                    confidence_bins.append((bin_threshholds[i - 1], bin_threshholds[i]))
 
-            # initialize segments by bin
             max_segments_per_bin = max_segments // len(confidence_bins)
             segments_by_bin = {confidence_bin: [] for confidence_bin in confidence_bins}
 
-            # sort segments by confidence
             species_segments[s].sort(key=lambda x: x["confidence"], reverse=True)
 
-            # Sort segments into bins
             for seg in species_segments[s]:
                 for confidence_bin in confidence_bins:
                     if seg["confidence"] >= confidence_bin[1]:
-                        continue # skip to next bin if confidence is too high
+                        continue  # skip to next bin if confidence is too high
                     if seg["confidence"] >= confidence_bin[0]:
                         segments_by_bin[confidence_bin].append(seg)
 
             species_segments[s] = []
 
-            # Add segments from each bin to species_segments
             for bin_segments in segments_by_bin.values():
-                # Select random segments when too many segments in bin
                 if len(bin_segments) > max_segments_per_bin:
                     RNG.shuffle(bin_segments)
                     species_segments[s].extend(bin_segments[:max_segments_per_bin])
                 else:
                     species_segments[s].extend(bin_segments)
 
-    # Make dict of segments per audio file
     segments: dict[str, list] = {}
     seg_cnt = 0
 
@@ -216,11 +201,10 @@ def parse_files(flist: list[dict], max_segments=100, collection_mode = "random")
 
     print(f"Found {seg_cnt} segments in {len(segments)} audio files.")
 
-    # Convert to list
     return [tuple(e) for e in segments.items()]
 
 
-def find_segments_from_combined(rfile: str) -> list[dict]:
+def _find_segments_from_combined(rfile: str, min_conf: float = 0.25, max_conf: float = 1.0) -> list[dict]:
     """Extracts the segments from a combined results file
 
     Args:
@@ -236,13 +220,13 @@ def find_segments_from_combined(rfile: str) -> list[dict]:
     lines = utils.read_lines(rfile)
 
     # Auto-detect result type
-    rtype = detect_rtype(lines[0])
+    rtype = _detect_rtypee(lines[0])
 
     if rtype == "audacity":
         raise Exception("Audacity files are not supported for combined results.")
 
     # Get mapping from the header column
-    header_mapping = get_header_mapping(lines[0])
+    header_mapping = _get_header_mapping(lines[0])
 
     # Get start and end times based on rtype
     confidence = 0
@@ -280,13 +264,13 @@ def find_segments_from_combined(rfile: str) -> list[dict]:
             afile = d[header_mapping["File"]].replace("/", os.sep).replace("\\", os.sep)
 
         # Check if confidence is high enough and label is not "nocall"
-        if confidence >= cfg.MIN_CONFIDENCE and confidence <= cfg.MAX_CONFIDENCE and species.lower() != "nocall" and afile:
+        if confidence >= min_conf and confidence <= max_conf and species.lower() != "nocall" and afile:
             segments.append({"audio": afile, "start": start, "end": end, "species": species, "confidence": confidence})
 
     return segments
 
 
-def find_segments(afile: str, rfile: str):
+def _find_segments(afile: str, rfile: str, min_conf: float = 0.25, max_conf: float = 1.0) -> list[dict]:
     """Extracts the segments for an audio file from the results file
 
     Args:
@@ -303,10 +287,10 @@ def find_segments(afile: str, rfile: str):
     lines = utils.read_lines(rfile)
 
     # Auto-detect result type
-    rtype = detect_rtype(lines[0])
+    rtype = _detect_rtypee(lines[0])
 
     # Get mapping from the header column
-    header_mapping = get_header_mapping(lines[0])
+    header_mapping = _get_header_mapping(lines[0])
 
     # Get start and end times based on rtype
     confidence = 0
@@ -343,13 +327,15 @@ def find_segments(afile: str, rfile: str):
             confidence = float(d[header_mapping["Confidence"]])
 
         # Check if confidence is high enough and label is not "nocall"
-        if confidence >= cfg.MIN_CONFIDENCE and confidence <= cfg.MAX_CONFIDENCE and species.lower() != "nocall":
+        if confidence >= min_conf and confidence <= max_conf and species.lower() != "nocall":
             segments.append({"audio": afile, "start": start, "end": end, "species": species, "confidence": confidence})
 
     return segments
 
 
-def extract_segments(item: tuple[tuple[str, list[dict]], float, dict[str]]):
+def extract_segments(
+    file_path: str, output_path: str, seg_length: float, segments: list[dict], sample_rate: int = 48000, audio_speed: float = 1.0
+) -> tuple[str, bool]:
     """
     Extracts audio segments from a given audio file based on provided segment information.
     Args:
@@ -360,63 +346,45 @@ def extract_segments(item: tuple[tuple[str, list[dict]], float, dict[str]]):
             - A float representing the segment length.
             - A dictionary containing configuration settings.
     Returns:
-        bool: True if segments were successfully extracted, False otherwise.
+        tuple[str, bool]: A tuple containing the file path and a boolean indicating if segments were successfully extracted.
     Raises:
         Exception: If there is an error opening the audio file or extracting segments.
     """
-    # Paths and config
-    afile = item[0][0]
-    segments = item[0][1]
-    seg_length = item[1]
-    cfg.set_config(item[2])
-
-    # Status
-    print(f"Extracting segments from {afile}")
-
     try:
-        # Open audio file
-        sig, rate = audio.open_audio_file(afile, cfg.SAMPLE_RATE, speed=cfg.AUDIO_SPEED)
+        sig, rate = audio.open_audio_file(file_path, sample_rate, speed=audio_speed)
     except Exception as ex:
-        print(f"Error: Cannot open audio file {afile}", flush=True)
+        print(f"Error: Cannot open audio file {file_path}", flush=True)
         utils.write_error_log(ex)
 
-        return None
+        return file_path, False
 
-    # Extract segments
     for seg_cnt, seg in enumerate(segments, 1):
         try:
-            # Get start and end times
-            start = int((seg["start"] * rate) / cfg.AUDIO_SPEED)
-            end = int((seg["end"] * rate) / cfg.AUDIO_SPEED)
-
+            start = int((seg["start"] * rate) / audio_speed)
+            end = int((seg["end"] * rate) / audio_speed)
             offset = max(0, ((seg_length * rate) - (end - start)) // 2)
             start = max(0, start - offset)
             end = min(len(sig), end + offset)
 
-            # Make sure segment is long enough
             if end > start:
-                # Get segment raw audio from signal
                 seg_sig = sig[int(start) : int(end)]
-
-                # Make output path
-                outpath = os.path.join(cfg.OUTPUT_PATH, seg["species"])
-                os.makedirs(outpath, exist_ok=True)
-
-                # Save segment
+                outpath = os.path.join(output_path, seg["species"])
                 seg_name = "{:.3f}_{}_{}_{:.2f}s_{:.2f}s.wav".format(
                     seg["confidence"],
                     seg_cnt,
-                    seg["audio"].rsplit(os.sep, 1)[-1].rsplit(".", 1)[0],
+                    file_path.rsplit(os.sep, 1)[-1].rsplit(".", 1)[0],
                     seg["start"],
                     seg["end"],
                 )
                 seg_path = os.path.join(outpath, seg_name)
+
+                os.makedirs(outpath, exist_ok=True)
                 audio.save_signal(seg_sig, seg_path, rate)
 
         except Exception as ex:
-            # Write error log
-            print(f"Error: Cannot extract segments from {afile}.", flush=True)
+            print(f"Error: Cannot extract segments from {file_path}.", flush=True)
             utils.write_error_log(ex)
-            return False
 
-    return True
+            return file_path, False
+
+    return file_path, True

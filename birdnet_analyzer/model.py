@@ -379,7 +379,7 @@ def save_model_params(path):
     Args:
         path: Path to the file.
     """
-    utils.save_params(
+    utils.save_params_to_file(
         path,
         (
             "Hidden units",
@@ -389,8 +389,8 @@ def save_model_params(path):
             "Crop mode",
             "Crop overlap",
             "Audio speed",
-            "Upsamling mode",
-            "Upsamling ratio",
+            "Upsampling mode",
+            "Upsampling ratio",
             "use mixup",
             "use label smoothing",
             "use focal loss",

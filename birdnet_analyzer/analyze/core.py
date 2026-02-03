@@ -46,6 +46,7 @@ def analyze(
     on_update: Callable[[AcousticProgressStats], None] | None = None,
     split_tables: bool = False,
     save_params: bool = False,
+    show_progress: bool = False,
     _return_only=False,
 ):
     """

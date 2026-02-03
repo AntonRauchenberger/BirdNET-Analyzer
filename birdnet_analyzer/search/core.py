@@ -45,11 +45,9 @@ def search(
     cfg.SAMPLE_RATE = cfg.BIRDNET_SAMPLE_RATE
     cfg.SIG_LENGTH = cfg.BIRDNET_SIG_LENGTH
 
-    # Create output folder
     if not os.path.exists(output):
         os.makedirs(output)
 
-    # Load the database
     db = get_database(database)
 
     try:
@@ -60,11 +58,8 @@ def search(
     fmin = settings["BANDPASS_FMIN"]
     fmax = settings["BANDPASS_FMAX"]
     audio_speed = settings["AUDIO_SPEED"]
-
-    # Execute the search
     results = get_search_results(queryfile, db, n_results, audio_speed, fmin, fmax, score_function, crop_mode, overlap)
 
-    # Save the results
     for r in results:
         embedding_source = db.get_embedding_source(r.embedding_id)
         file = embedding_source.source_id

@@ -230,7 +230,7 @@ def audio_speed_args():
     which allows the user to specify a speed factor for audio playback. The speed factor
     must be a float value where values less than 1.0 will slow down the audio and values
     greater than 1.0 will speed it up. The minimum allowed value is 0.01. The default
-    value is taken from the configuration (`cfg.AUDIO_SPEED`).
+    value is 1.0.
     Returns:
         argparse.ArgumentParser: The argument parser with the `--audio_speed` argument configured.
     """
@@ -239,7 +239,7 @@ def audio_speed_args():
     p.add_argument(
         "--audio_speed",
         type=lambda a: max(0.01, float(a)),
-        default=cfg.AUDIO_SPEED,
+        default=1.0,
         help="Speed factor for audio playback. Values < 1.0 will slow down the audio, values > 1.0 will speed it up. At a 10x decrease (audio speed 0.1), a 384 kHz recording becomes a 38.4 kHz recording.",
     )
 
@@ -280,14 +280,14 @@ def min_conf_args():
     The --min_conf argument:
         - Sets the minimum confidence threshold for predictions.
         - Accepts float values in the range [0.01, 0.99].
-        - Defaults to the value specified in cfg.MIN_CONFIDENCE.
+        - Defaults to 0.25.
         - Ensures that the provided value is clamped between 0.01 and 0.99.
     """
     p = argparse.ArgumentParser(add_help=False)
 
     p.add_argument(
         "--min_conf",
-        default=cfg.MIN_CONFIDENCE,
+        default=0.25,
         type=lambda a: max(0.00001, min(0.99, float(a))),
         help="Minimum confidence threshold. Values in [0.00001, 0.99].",
     )
@@ -471,13 +471,6 @@ def analyzer_parser():
     parser.add_argument("--split_tables", action="store_true", help="Saves separate result tables for each input audio file in the output.")
     parser.set_defaults(model="birdnet")
 
-    parser.add_argument(
-        "--show_progress",
-        action="store_true",
-        default=False,
-        help="Show progress bar during analysis.",
-    )
-
     return parser
 
 
@@ -622,7 +615,7 @@ def segments_parser():
     )
     parser.add_argument(
         "--max_conf",
-        default=cfg.MAX_CONFIDENCE,
+        default=1.0,
         type=lambda a: max(0.00001, min(1.0, float(a))),
         help="Maximum confidence threshold. Values in [0.00001, 1.0].",
     )

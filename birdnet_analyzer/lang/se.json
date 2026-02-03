@@ -210,6 +210,7 @@
     "segments-tab-output-selection-textbox-placeholder": "Samma som ljudkatalog om inte vald",
     "segments-tab-result-dataframe-column-execution-header": "Körning",
     "segments-tab-result-dataframe-column-file-header": "Fil",
+    "segments-tab-result-dataframe-column-success-header": "Alla segment extraherades framgångsrikt!",
     "segments-tab-results-input-textbox-placeholder": "Samma som ljudkatalog om inte vald",
     "segments-tab-select-audio-input-directory-button-label": "Välj ljudkatalog (rekursiv)",
     "segments-tab-select-results-input-directory-button-label": "Välj resultatkatalog",

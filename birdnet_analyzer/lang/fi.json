@@ -210,6 +210,7 @@
     "segments-tab-output-selection-textbox-placeholder": "Sama kuin äänihakemisto, jos ei valittu",
     "segments-tab-result-dataframe-column-execution-header": "Suoritus",
     "segments-tab-result-dataframe-column-file-header": "Tiedosto",
+    "segments-tab-result-dataframe-column-success-header": "Kaikki segmentit poimittiin onnistuneesti!",
     "segments-tab-results-input-textbox-placeholder": "Sama kuin äänihakemisto, jos ei valittu",
     "segments-tab-select-audio-input-directory-button-label": "Valitse äänihakemisto (rekursiivinen)",
     "segments-tab-select-results-input-directory-button-label": "Valitse tuloshakemisto",

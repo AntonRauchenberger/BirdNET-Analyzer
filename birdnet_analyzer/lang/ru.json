@@ -210,6 +210,7 @@
     "segments-tab-output-selection-textbox-placeholder": "То же, что и каталог аудио, если не выбран",
     "segments-tab-result-dataframe-column-execution-header": "Выполнение",
     "segments-tab-result-dataframe-column-file-header": "Файл",
+    "segments-tab-result-dataframe-column-success-header": "Все сегменты были успешно извлечены!",
     "segments-tab-results-input-textbox-placeholder": "То же, что и каталог аудио, если не выбран",
     "segments-tab-select-audio-input-directory-button-label": "Выберите каталог аудио (рекурсивный)",
     "segments-tab-select-results-input-directory-button-label": "Выберите каталог результатов",

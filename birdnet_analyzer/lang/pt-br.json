@@ -210,6 +210,7 @@
     "segments-tab-output-selection-textbox-placeholder": "Se não selecionado, o mesmo diretório de áudios será utilizado",
     "segments-tab-result-dataframe-column-execution-header": "Execução",
     "segments-tab-result-dataframe-column-file-header": "Arquivo",
+    "segments-tab-result-dataframe-column-success-header": "Todos os segmentos foram extraídos com sucesso!",
     "segments-tab-results-input-textbox-placeholder": "Se não selecionado, o mesmo diretório de áudios será utilizado",
     "segments-tab-select-audio-input-directory-button-label": "Selecione o diretório de áudios (recursivo)",
     "segments-tab-select-results-input-directory-button-label": "Selecione o diretório de resultados",

@@ -210,6 +210,7 @@
     "segments-tab-output-selection-textbox-placeholder": "Identique au répertoire audio s'il n'est pas sélectionné",
     "segments-tab-result-dataframe-column-execution-header": "Execution",
     "segments-tab-result-dataframe-column-file-header": "Fichier",
+    "segments-tab-result-dataframe-column-success-header": "Tous les segments ont été extraits avec succès !",
     "segments-tab-results-input-textbox-placeholder": "Identique au répertoire audio s'il n'est pas sélectionné",
     "segments-tab-select-audio-input-directory-button-label": "Sélectionner le dossier de l’audio (récursif)",
     "segments-tab-select-results-input-directory-button-label": "Sélectionner le dossier du résultat",

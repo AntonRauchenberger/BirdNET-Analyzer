@@ -210,6 +210,7 @@
     "segments-tab-output-selection-textbox-placeholder": "Gleich wie das Audioverzeichnis, wenn nicht ausgewählt",
     "segments-tab-result-dataframe-column-execution-header": "Ausführung",
     "segments-tab-result-dataframe-column-file-header": "Datei",
+    "segments-tab-result-dataframe-column-success-header": "Alle Segmente wurden erfolgreich extrahiert!",
     "segments-tab-results-input-textbox-placeholder": "Gleich wie das Audioverzeichnis, wenn nicht ausgewählt",
     "segments-tab-select-audio-input-directory-button-label": "Wählen Sie das Audioverzeichnis (rekursiv)",
     "segments-tab-select-results-input-directory-button-label": "Wählen Sie das Ergebnisverzeichnis",

@@ -36,7 +36,14 @@ def _extract_segments(
         on_update=on_update if progress else None,
     )
 
-    return [[os.path.relpath(r[0], audio_dir), r[1]] for r in segments_list]
+    skipped_files = [[os.path.relpath(r[0], audio_dir)] for r in segments_list if not r[1]]
+    header = (
+        [loc.localize("multi-tab-result-dataframe-column-invalid-file-header")]
+        if skipped_files
+        else [loc.localize("segments-tab-result-dataframe-column-success-header")]
+    )
+
+    return gr.update(value=skipped_files, headers=header, elem_classes=None if not skipped_files else "success")
 
 
 def build_segments_tab():
@@ -116,7 +123,6 @@ def build_segments_tab():
                     info=loc.localize("segments-tab-collection-mode-info"),
                     interactive=True,
                 )
-
                 num_bins = gr.Number(
                     10,
                     label=loc.localize("segments-tab-n-bins-label"),
@@ -155,13 +161,7 @@ def build_segments_tab():
             )
 
         extract_segments_btn = gr.Button(loc.localize("segments-tab-extract-button-label"), variant="huggingface")
-
-        result_grid = gr.Matrix(
-            headers=[
-                loc.localize("segments-tab-result-dataframe-column-file-header"),
-                loc.localize("segments-tab-result-dataframe-column-execution-header"),
-            ],
-        )
+        result_grid = gr.Matrix(headers=[""], col_count=1)
 
         extract_segments_btn.click(
             _extract_segments,

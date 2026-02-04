@@ -33,10 +33,7 @@ def load_local_state():
         with open(f"{LANGUAGE_DIR}/{TARGET_LANGUAGE}.json", encoding="utf-8") as f:
             LANGUAGE_LOOKUP = json.load(f)
     except FileNotFoundError:
-        print(
-            f"Language file for {TARGET_LANGUAGE} not found in {LANGUAGE_DIR}. "
-            f"Using fallback language {settings.FALLBACK_LANGUAGE}."
-        )
+        print(f"Language file for {TARGET_LANGUAGE} not found in {LANGUAGE_DIR}. Using fallback language {settings.FALLBACK_LANGUAGE}.")
 
     if TARGET_LANGUAGE != settings.FALLBACK_LANGUAGE:
         with open(f"{LANGUAGE_DIR}/{settings.FALLBACK_LANGUAGE}.json") as f:

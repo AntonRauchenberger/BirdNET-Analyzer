@@ -1,10 +1,17 @@
-from collections.abc import Callable
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import birdnet
-from birdnet.acoustic_models.inference.encoding.result import AcousticFileEncodingResult
-from birdnet.acoustic_models.inference.perf_tracker import AcousticProgressStats
-from birdnet.acoustic_models.inference.prediction.result import AcousticFilePredictionResult
-from birdnet.globals import ACOUSTIC_MODEL_VERSIONS, MODEL_LANGUAGES
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    import numpy as np
+    from birdnet.acoustic_models.inference.encoding.result import AcousticFileEncodingResult
+    from birdnet.acoustic_models.inference.perf_tracker import AcousticProgressStats
+    from birdnet.acoustic_models.inference.prediction.result import AcousticFilePredictionResult
+    from birdnet.globals import ACOUSTIC_MODEL_VERSIONS, MODEL_LANGUAGES
 
 GLOBAL_PREFETCH_RATIO = 2
 
@@ -90,3 +97,36 @@ def get_embeddings(
         n_workers=n_workers,
         n_feeders=n_producers,
     )
+
+
+def get_embeddings_array(
+    signals: list[np.ndarray],
+    version: ACOUSTIC_MODEL_VERSIONS = "2.4",
+    batch_size=1,
+    n_workers: int | None = None,
+    n_producers: int = 1,
+    prefetch_ratio=GLOBAL_PREFETCH_RATIO,
+    bandpass_fmin=0,
+    bandpass_fmax=15_000,
+    speed=1.0,
+    callback: Callable[[AcousticProgressStats], None] | None = None,
+) -> np.ndarray:
+    model = birdnet.load("acoustic", version, "tf")
+
+    return model.encode_array(
+        signals,
+        batch_size=batch_size,
+        prefetch_ratio=prefetch_ratio,
+        bandpass_fmin=bandpass_fmin,
+        bandpass_fmax=bandpass_fmax,
+        speed=speed,
+        progress_callback=callback,
+        n_workers=n_workers,
+        n_feeders=n_producers,
+    )
+
+
+def get_species_list(lat: float, lon: float, week: int | None, lang: MODEL_LANGUAGES = "en_us", threshold: float = 0.03) -> list[str]:
+    model = birdnet.load("geo", "2.4", "tf", lang=lang)
+
+    return model.predict(lat, lon, week=week, min_confidence=threshold)

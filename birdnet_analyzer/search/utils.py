@@ -1,19 +1,26 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, get_args
+
 import numpy as np
 from perch_hoplite.db import brutalism
 from perch_hoplite.db.search_results import SearchResult
 from scipy.spatial.distance import euclidean
 
-import birdnet_analyzer.config as cfg
-from birdnet_analyzer import audio, model
+from birdnet_analyzer import audio, model_utils
+from birdnet_analyzer.config import CROP_MODES, SCORE_FUNCTIONS
+
+if TYPE_CHECKING:
+    from perch_hoplite.db.sqlite_usearch_impl import SQLiteUsearchDB
 
 
-def cosine_sim(a, b):
+def cosine_sim(a: np.ndarray, b: np.ndarray) -> float:
     if a.ndim == 2:
         return np.array([cosine_sim(a[i], b) for i in range(a.shape[0])])
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 
-def euclidean_scoring(a, b):
+def euclidean_scoring(a: np.ndarray, b: np.ndarray) -> float:
     if a.ndim == 2:
         return np.array([euclidean_scoring(a[i], b) for i in range(a.shape[0])])
     return euclidean(a, b)
@@ -23,7 +30,9 @@ def euclidean_scoring_inverse(a, b):
     return -euclidean_scoring(a, b)
 
 
-def get_query_embedding(queryfile_path):
+def get_query_embedding(
+    queryfile_path, crop_mode: CROP_MODES = "center", crop_overlap=0.0, bandpass_fmin=0, bandpass_fmax=15000, audio_speed=1.0, sig_length=3.0, sig_minlen=1.0
+):
     """
     Extracts the embedding for a query file. Reads only the first 3 seconds
     Args:
@@ -32,40 +41,52 @@ def get_query_embedding(queryfile_path):
         The query embedding.
     """
 
-    # Load audio
     sig, rate = audio.open_audio_file(
         queryfile_path,
-        duration=cfg.BIRDNET_SIG_LENGTH * cfg.AUDIO_SPEED if cfg.SAMPLE_CROP_MODE == "first" else None,
-        fmin=cfg.BANDPASS_FMIN,
-        fmax=cfg.BANDPASS_FMAX,
-        speed=cfg.AUDIO_SPEED,
+        duration=sig_length * audio_speed if crop_mode == "first" else None,
+        fmin=bandpass_fmin,
+        fmax=bandpass_fmax,
+        speed=audio_speed,
     )
 
-    # Crop query audio
-    if cfg.SAMPLE_CROP_MODE == "center":
-        sig_splits = [audio.crop_center(sig, rate, cfg.BIRDNET_SIG_LENGTH)]
-    elif cfg.SAMPLE_CROP_MODE == "first":
-        sig_splits = [audio.split_signal(sig, rate, cfg.BIRDNET_SIG_LENGTH, cfg.SIG_OVERLAP, cfg.SIG_MINLEN)[0]]
+    if crop_mode == "center":
+        sig_splits = [audio.crop_center(sig, rate, sig_length)]
+    elif crop_mode == "first":
+        sig_splits = [audio.split_signal(sig, rate, sig_length, crop_overlap, sig_minlen)[0]]
     else:
-        sig_splits = audio.split_signal(sig, rate, cfg.BIRDNET_SIG_LENGTH, cfg.SIG_OVERLAP, cfg.SIG_MINLEN)
+        sig_splits = audio.split_signal(sig, rate, sig_length, crop_overlap, sig_minlen)
 
-    return model.embeddings(sig_splits)
+    return model_utils.get_embeddings_array(sig_splits)
 
 
 def get_search_results(
-    queryfile_path, db, n_results, audio_speed, fmin, fmax, score_function: str, crop_mode, crop_overlap
+    queryfile_path: str,
+    db: SQLiteUsearchDB,
+    n_results=10,
+    audio_speed=1.0,
+    fmin=0,
+    fmax=15000,
+    score_function: SCORE_FUNCTIONS = "cosine",
+    crop_mode: CROP_MODES = "center",
+    crop_overlap=0.0,
+    sig_length=3.0,
+    sig_fmin=0,
+    sig_fmax=15000,
 ):
-    # Set bandpass frequency range
-    cfg.BANDPASS_FMIN = max(0, min(cfg.SIG_FMAX, int(fmin)))
-    cfg.BANDPASS_FMAX = max(cfg.SIG_FMIN, min(cfg.SIG_FMAX, int(fmax)))
-    cfg.AUDIO_SPEED = max(0.01, audio_speed)
-    cfg.SAMPLE_CROP_MODE = crop_mode
-    cfg.SIG_OVERLAP = max(0.0, min(2.9, float(crop_overlap)))
+    bandpass_fmin = max(0, min(sig_fmax, int(fmin)))
+    bandpass_fmax = max(sig_fmin, min(sig_fmax, int(fmax)))
+    audio_speed = max(0.01, audio_speed)
+    sig_overlap = max(0.0, min(2.9, float(crop_overlap)))
+    query_embeddings = get_query_embedding(
+        queryfile_path,
+        crop_mode=crop_mode,
+        crop_overlap=sig_overlap,
+        bandpass_fmin=bandpass_fmin,
+        bandpass_fmax=bandpass_fmax,
+        audio_speed=audio_speed,
+        sig_length=sig_length,
+    )
 
-    # Get query embedding
-    query_embeddings = get_query_embedding(queryfile_path)
-
-    # Set score function
     if score_function == "cosine":
         score_fn = cosine_sim
     elif score_function == "dot":
@@ -73,11 +94,11 @@ def get_search_results(
     elif score_function == "euclidean":
         score_fn = euclidean_scoring_inverse  # TODO: this is a bit hacky since the search function expects the score to be high for similar embeddings
     else:
-        raise ValueError("Invalid score function. Choose 'cosine', 'euclidean' or 'dot'.")
+        raise ValueError(f"Invalid score function. Choose {', '.join(get_args(SCORE_FUNCTIONS))}.")
 
     db_embeddings_count = db.count_embeddings()
     n_results = min(n_results, db_embeddings_count - 1)
-    scores_by_embedding_id = {}
+    scores_by_embedding_id: dict[int, list[float]] = {}
 
     for embedding in query_embeddings:
         results, scores = brutalism.threaded_brute_search(db, embedding, n_results, score_fn)
@@ -90,15 +111,16 @@ def get_search_results(
         for result in sorted_results:
             if result.embedding_id not in scores_by_embedding_id:
                 scores_by_embedding_id[result.embedding_id] = []
+
             scores_by_embedding_id[result.embedding_id].append(result.sort_score)
 
-    results = []
+    search_results: list[SearchResult] = []
 
     for embedding_id, scores in scores_by_embedding_id.items():
-        results.append(SearchResult(embedding_id, np.sum(scores) / len(query_embeddings)))
+        search_results.append(SearchResult(embedding_id, np.sum(scores) / len(query_embeddings)))
 
     reverse = score_function != "euclidean"
 
-    results.sort(key=lambda x: x.sort_score, reverse=reverse)
+    search_results.sort(key=lambda x: x.sort_score, reverse=reverse)
 
-    return results[0:n_results]
+    return search_results[0:n_results]

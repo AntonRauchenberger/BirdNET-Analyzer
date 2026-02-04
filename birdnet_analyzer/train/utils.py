@@ -263,6 +263,7 @@ def _load_training_data(cache_mode=None, cache_file="", progress_callback=None):
     # Return only the valid labels for further use
     return x_train, y_train, x_test, y_test, valid_labels
 
+
 def train_model(on_epoch_end=None, on_trial_result=None, on_data_load_end=None, autotune_directory="autotune"):
     """Trains a custom classifier.
 
@@ -275,10 +276,6 @@ def train_model(on_epoch_end=None, on_trial_result=None, on_data_load_end=None, 
     Returns:
         A keras `History` object, whose `history` property contains all the metrics.
     """
-    cfg.MODEL_PATH = cfg.BIRDNET_MODEL_PATH
-    cfg.LABELS_FILE = cfg.BIRDNET_LABELS_FILE
-    cfg.SAMPLE_RATE = cfg.BIRDNET_SAMPLE_RATE
-    cfg.SIG_LENGTH = cfg.BIRDNET_SIG_LENGTH
 
     # Load training data
     print("Loading training data...", flush=True)
@@ -532,7 +529,7 @@ def train_model(on_epoch_end=None, on_trial_result=None, on_data_load_end=None, 
     print("Saving model...", flush=True)
 
     try:
-        classifier.pop() # Remove activation
+        classifier.pop()  # Remove activation
 
         if cfg.TRAINED_MODEL_OUTPUT_FORMAT == "both":
             model.save_raven_model(classifier, cfg.CUSTOM_CLASSIFIER, labels, mode=cfg.TRAINED_MODEL_SAVE_MODE)

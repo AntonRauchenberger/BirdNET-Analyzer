@@ -1,4 +1,9 @@
-from typing import Literal
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from birdnet_analyzer.config import CROP_MODES, SCORE_FUNCTIONS
 
 
 def search(
@@ -7,8 +12,8 @@ def search(
     queryfile: str,
     *,
     n_results: int = 10,
-    score_function: Literal["cosine", "euclidean", "dot"] = "cosine",
-    crop_mode: Literal["center", "first", "segments"] = "center",
+    score_function: SCORE_FUNCTIONS = "cosine",
+    crop_mode: CROP_MODES = "center",
     overlap: float = 0.0,
 ):
     """
@@ -18,9 +23,9 @@ def search(
         database (str): Path to the database file to search in.
         queryfile (str): Path to the query file containing the search input.
         n_results (int, optional): Number of top results to return. Defaults to 10.
-        score_function (Literal["cosine", "euclidean", "dot"], optional):
+        score_function (SCORE_FUNCTIONS, optional):
             Scoring function to use for similarity calculation. Defaults to "cosine".
-        crop_mode (Literal["center", "first", "segments"], optional):
+        crop_mode (CROP_MODES, optional):
             Mode for cropping audio segments. Defaults to "center".
         overlap (float, optional): Overlap ratio for audio segments. Defaults to 0.0.
     Raises:
@@ -36,14 +41,9 @@ def search(
     """
     import os
 
-    import birdnet_analyzer.config as cfg
     from birdnet_analyzer import audio
+    from birdnet_analyzer.embeddings.core import SETTINGS_KEY
     from birdnet_analyzer.search.utils import get_search_results
-
-    cfg.MODEL_PATH = cfg.BIRDNET_MODEL_PATH
-    cfg.LABELS_FILE = cfg.BIRDNET_LABELS_FILE
-    cfg.SAMPLE_RATE = cfg.BIRDNET_SAMPLE_RATE
-    cfg.SIG_LENGTH = cfg.BIRDNET_SIG_LENGTH
 
     if not os.path.exists(output):
         os.makedirs(output)
@@ -51,14 +51,16 @@ def search(
     db = get_database(database)
 
     try:
-        settings = db.get_metadata("birdnet_analyzer_settings")
+        settings = db.get_metadata(SETTINGS_KEY)
     except KeyError as e:
         raise ValueError("No settings present in database.") from e
 
-    fmin = settings["BANDPASS_FMIN"]
-    fmax = settings["BANDPASS_FMAX"]
-    audio_speed = settings["AUDIO_SPEED"]
-    results = get_search_results(queryfile, db, n_results, audio_speed, fmin, fmax, score_function, crop_mode, overlap)
+    fmin: int = settings["BANDPASS_FMIN"]
+    fmax: int = settings["BANDPASS_FMAX"]
+    audio_speed: float = settings["AUDIO_SPEED"]
+    sig_length: float = settings.get("SIG_LENGTH", 3.0)
+    duration = sig_length * audio_speed
+    results = get_search_results(queryfile, db, n_results, audio_speed, fmin, fmax, score_function, crop_mode, overlap, sig_length)
 
     for r in results:
         embedding_source = db.get_embedding_source(r.embedding_id)
@@ -66,10 +68,9 @@ def search(
         filebasename = os.path.basename(file)
         filebasename = os.path.splitext(filebasename)[0]
         offset = embedding_source.offsets[0]
-        duration = cfg.BIRDNET_SIG_LENGTH * audio_speed
         sig, rate = audio.open_audio_file(file, offset=offset, duration=duration, sample_rate=None)
         result_path = os.path.join(output, f"{r.sort_score:.5f}_{filebasename}_{offset}_{offset + duration}.wav")
-        audio.save_signal(sig, result_path, rate)
+        audio.save_signal(sig, result_path, rate) # type: ignore
 
     db.db.close()
 
@@ -77,4 +78,4 @@ def search(
 def get_database(database_path):
     from perch_hoplite.db import sqlite_usearch_impl
 
-    return sqlite_usearch_impl.SQLiteUsearchDB.create(database_path).thread_split()
+    return sqlite_usearch_impl.SQLiteUsearchDB.create(database_path)

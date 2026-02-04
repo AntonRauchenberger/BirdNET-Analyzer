@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from birdnet.acoustic_models.inference.prediction.result import AcousticResultBase
     from birdnet.globals import ACOUSTIC_MODEL_VERSIONS, MODEL_LANGUAGES
 
-    from birdnet_analyzer.config import RESULT_TYPES
+    from birdnet_analyzer.config import ADDITIONAL_COLUMNS, RESULT_TYPES
 
 
 def analyze(
@@ -42,7 +42,7 @@ def analyze(
     top_n: int | None = None,
     merge_consecutive: int = 1,
     locale: MODEL_LANGUAGES = "en_us",
-    additional_columns: list[str] | None = None,
+    additional_columns: list[ADDITIONAL_COLUMNS] | None = None,
     on_update: Callable[[AcousticProgressStats], None] | None = None,
     split_tables: bool = False,
     save_params: bool = False,

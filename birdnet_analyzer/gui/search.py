@@ -57,6 +57,7 @@ def update_export_state(audio_infos, checkbox_value, export_state: dict):
 
 @gu.gui_runtime_error_handler
 def run_search(db_path, query_path, max_samples, score_fn, crop_mode, crop_overlap):
+    from birdnet_analyzer.embeddings.core import SETTINGS_KEY
     from birdnet_analyzer.search.utils import get_search_results
 
     gu.validate(db_path, loc.localize("embeddings-search-db-validation-message"))
@@ -69,7 +70,7 @@ def run_search(db_path, query_path, max_samples, score_fn, crop_mode, crop_overl
     cfg.SIG_LENGTH = cfg.BIRDNET_SIG_LENGTH
 
     db = get_search_database(db_path)
-    settings = db.get_metadata("birdnet_analyzer_settings")
+    settings = db.get_metadata(SETTINGS_KEY)
 
     results = get_search_results(
         query_path,
@@ -91,6 +92,7 @@ def run_search(db_path, query_path, max_samples, score_fn, crop_mode, crop_overl
 
 def build_search_tab():
     from birdnet_analyzer import audio, utils
+    from birdnet_analyzer.embeddings.core import SETTINGS_KEY
 
     with gr.Tab(loc.localize("embeddings-search-tab-title")):
         results_state = gr.State([])
@@ -177,7 +179,7 @@ def build_search_tab():
                         with gr.Row():
                             if db_path is not None and len(results) > 0:
                                 db = get_search_database(db_path)
-                                settings = db.get_metadata("birdnet_analyzer_settings")
+                                settings = db.get_metadata(SETTINGS_KEY)
 
                                 for i, r in enumerate(results[page]):
                                     with gr.Column():
@@ -245,7 +247,7 @@ def build_search_tab():
             raise gr.Error(loc.localize("embeddings-search-db-selection-error")) from e
 
         embedding_count = db.count_embeddings()
-        settings = db.get_metadata("birdnet_analyzer_settings")
+        settings = db.get_metadata(SETTINGS_KEY)
         frequencies = f"{settings['BANDPASS_FMIN']} - {settings['BANDPASS_FMAX']} Hz"
         speed = settings["AUDIO_SPEED"]
         db.db.close()
@@ -280,7 +282,7 @@ def build_search_tab():
 
         if audiofilepath and db_selection:
             db = get_embeddings_database(db_selection)
-            settings = db.get_metadata("birdnet_analyzer_settings")
+            settings = db.get_metadata(SETTINGS_KEY)
             audio_speed = settings["AUDIO_SPEED"]
             fmin = settings["BANDPASS_FMIN"]
             fmax = settings["BANDPASS_FMAX"]

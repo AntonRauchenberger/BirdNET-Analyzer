@@ -17,14 +17,12 @@ RANDOM_SEED: int = 42
 ##########################
 
 MODEL_VERSION: str = "V2.4"
-PB_MODEL: str = os.path.join(SCRIPT_DIR, "checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_Model")
 BIRDNET_MODEL_PATH: str = os.path.join(SCRIPT_DIR, "checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_Model_FP32.tflite")
 PERCH_V2_MODEL_PATH: str = os.path.join(SCRIPT_DIR, "checkpoints/perch_v2")
 MDATA_MODEL_PATH: str = os.path.join(SCRIPT_DIR, "checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_MData_Model_V2_FP16.tflite")
 BIRDNET_LABELS_FILE: str = os.path.join(SCRIPT_DIR, "checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels.txt")
 PERCH_LABELS_FILE: str = os.path.join(PERCH_V2_MODEL_PATH, "assets", "labels.csv")
 TRANSLATED_LABELS_PATH: str = os.path.join(SCRIPT_DIR, "labels/V2.4")
-USE_PERCH: bool = False
 
 ##################
 # Audio settings #
@@ -34,11 +32,9 @@ USE_PERCH: bool = False
 # (batch size, 48000 kHz * 3 seconds) = (1, 144000)
 # Recordings will be resampled automatically.
 BIRDNET_SAMPLE_RATE: int = 48000
-PERCH_SAMPLE_RATE: int = 32000
 
 # We're using 3-second chunks
 BIRDNET_SIG_LENGTH: float = 3.0
-PERCH_SIG_LENGTH: float = 5.0
 
 # Define overlap between consecutive chunks <3.0; 0 = no overlap
 SIG_OVERLAP: float = 0.0
@@ -70,6 +66,14 @@ LONGITUDE: float = -1
 WEEK: int = -1
 LOCATION_FILTER_THRESHOLD: float = 0.03
 
+
+###################
+# Search settings #
+###################
+
+SCORE_FUNCTIONS = Literal["cosine", "euclidean", "dot"]
+CROP_MODES = Literal["center", "first", "segments"]
+
 ######################
 # Inference settings #
 ######################
@@ -89,38 +93,7 @@ CPU_THREADS: int = 8
 TFLITE_THREADS: int = 1
 
 # False will output logits, True will convert to sigmoid activations
-APPLY_SIGMOID: bool = True
 SIGMOID_SENSITIVITY: float = 1.0
-
-# Minimum confidence score to include in selection table
-# (be aware: if APPLY_SIGMOID = False, this no longer represents
-# probabilities and needs to be adjusted)
-MIN_CONFIDENCE: float = 0.25
-
-# Maximum confidence score for the segments feature.
-MAX_CONFIDENCE: float = 1.0
-
-# How segments are selected from the result files.
-SEGMENTS_COLLECTION_MODE: str = "random"
-
-# Number of bins for the balanced collection mode
-BALANCED_COLLECTION_BINS: int = 10
-
-# Number of consecutive detections for one species to merge into one
-# If set to 1 or 0, no merging will be done
-# If set to None, all detections will be included
-MERGE_CONSECUTIVE: int = 1
-
-# Number of samples to process at the same time. Higher values can increase
-# processing speed, but will also increase memory usage.
-# Might only be useful for GPU inference.
-BATCH_SIZE: int = 1
-
-
-# Number of seconds to load from a file at a time
-# Files will be loaded into memory in segments that are only as long as this value
-# Lowering this value results in lower memory usage
-FILE_SPLITTING_DURATION: int = 600
 
 # Whether to use noise to pad the signal
 # If set to False, the signal will be padded with zeros
@@ -130,7 +103,7 @@ USE_NOISE: bool = False
 # 'audacity' denotes a TXT file with the same format as Audacity timeline labels
 # 'csv' denotes a generic CSV file with start, end, species and confidence.
 RESULT_TYPES = Literal["table", "audacity", "kaleidoscope", "csv"]
-ADDITIONAL_COLUMNS: list[str] | None = None
+ADDITIONAL_COLUMNS = Literal["lat", "lon", "week", "overlap", "sensitivity", "min_conf", "species_list", "model"]
 OUTPUT_RAVEN_FILENAME: str = "BirdNET_SelectionTable.txt"  # this is for combined Raven selection tables only
 OUTPUT_KALEIDOSCOPE_FILENAME: str = "BirdNET_Kaleidoscope.csv"
 OUTPUT_CSV_FILENAME: str = "BirdNET_CombinedTable.csv"
@@ -138,9 +111,6 @@ OUTPUT_AUDACITY_FILENAME: str = "BirdNET_AudacityLabels.txt"
 
 # File name of the settings csv for batch analysis
 ANALYSIS_PARAMS_FILENAME: str = "BirdNET_analysis_params.csv"
-
-COMBINE_RESULTS: bool = False
-
 LABEL_LANGUAGE: MODEL_LANGUAGES = MODEL_LANGUAGE_EN_US
 
 #####################
@@ -231,12 +201,10 @@ OUTPUT_PATH: str = ""
 TRAIN_DATA_PATH: str = ""
 TEST_DATA_PATH: str = ""
 
-CODES = {}
 LABELS: list[str] = []
 TRANSLATED_LABELS: list[str] = []
 SPECIES_LIST: list[str] = []
 ERROR_LOG_FILE: str = os.path.join(SCRIPT_DIR, "error_log.txt")
-FILE_LIST = []
 FILE_STORAGE_PATH: str = ""
 
 # Path to custom trained classifier
@@ -260,12 +228,3 @@ def get_config():
 def set_config(c: dict):
     for k, v in c.items():
         globals()[k] = v
-
-
-#####################
-# Convenience funcs #
-#####################
-
-
-def perch_labels_file():
-    return os.path.join(PERCH_V2_MODEL_PATH, "assets", "labels.csv")

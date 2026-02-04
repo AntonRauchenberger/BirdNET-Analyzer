@@ -11,7 +11,6 @@ def main():
 
     from birdnet_analyzer import cli
 
-    # Freeze support for executable
     freeze_support()
 
     parser = cli.analyzer_parser()

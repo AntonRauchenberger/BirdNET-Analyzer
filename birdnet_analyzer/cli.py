@@ -318,14 +318,14 @@ def locale_args():
     return p
 
 
-def bs_args(default=cfg.BATCH_SIZE):
+def bs_args(default=1):
     """
     Creates an argument parser for batch size configuration.
     Returns:
         argparse.ArgumentParser: An argument parser with a batch size argument.
     The parser includes the following argument:
         -b, --batch_size: An integer specifying the number of samples to process at the same time.
-                         The value must be at least 1. Defaults to the value of cfg.BATCH_SIZE.
+                         The value must be at least 1. Defaults to the value of 1.
     """
     p = argparse.ArgumentParser(add_help=False)
 
@@ -621,7 +621,7 @@ def segments_parser():
     )
     parser.add_argument(
         "--collection_mode",
-        default=cfg.SEGMENTS_COLLECTION_MODE,
+        default="random",
         choices=["random", "confidence", "balanced"],
         help="Collection mode for selecting the segments. Can be 'random' or 'confidence'.",
     )

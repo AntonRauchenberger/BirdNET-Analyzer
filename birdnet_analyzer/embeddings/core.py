@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 DATASET_NAME: str = "birdnet_analyzer_dataset"
 COMMIT_BS_SIZE = 512
+SETTINGS_KEY = "birdnet_analyzer_settings"
 
 
 def embeddings(
@@ -171,8 +172,10 @@ def _get_or_create_database(db_path: str, embedding_dim: int = 1024):
 def _check_database_settings(db: sqlite_usearch_impl.SQLiteUsearchDB, fmin: int = 0, fmax: int = 15000, audio_speed: float = 1.0):
     from ml_collections import ConfigDict
 
+    from birdnet_analyzer.embeddings.core import SETTINGS_KEY
+
     try:
-        settings = db.get_metadata("birdnet_analyzer_settings")
+        settings = db.get_metadata(SETTINGS_KEY)
 
         if settings["BANDPASS_FMIN"] != fmin or settings["BANDPASS_FMAX"] != fmax or settings["AUDIO_SPEED"] != audio_speed:
             raise ValueError(
@@ -182,5 +185,5 @@ def _check_database_settings(db: sqlite_usearch_impl.SQLiteUsearchDB, fmin: int 
     except KeyError:
         settings = ConfigDict({"BANDPASS_FMIN": fmin, "BANDPASS_FMAX": fmax, "AUDIO_SPEED": audio_speed})
 
-        db.insert_metadata("birdnet_analyzer_settings", settings)
+        db.insert_metadata(SETTINGS_KEY, settings)
         db.commit()

@@ -54,7 +54,7 @@ def run_embeddings(
     file_output,
     progress,
 ):
-    from birdnet_analyzer.embeddings.core import embeddings
+    from birdnet_analyzer.embeddings.core import SETTINGS_KEY, embeddings
 
     gu.validate(input_path, loc.localize("embeddings-input-dir-validation-message"))
     gu.validate(db_directory, loc.localize("embeddings-db-dir-validation-message"))
@@ -63,7 +63,7 @@ def run_embeddings(
     db = get_embeddings_database(db_directory)
 
     try:
-        settings = db.get_metadata("birdnet_analyzer_settings")
+        settings = db.get_metadata(SETTINGS_KEY)
 
         db.db.close()
         embeddings(
@@ -94,6 +94,8 @@ def run_embeddings(
 
 
 def build_embeddings_tab():
+    from birdnet_analyzer.embeddings.core import SETTINGS_KEY
+
     with gr.Tab(loc.localize("embeddings-tab-title")):
         input_directory_state = gr.State()
         db_directory_state = gr.State()
@@ -180,7 +182,7 @@ def build_embeddings_tab():
 
                     if db:
                         try:
-                            settings = db.get_metadata("birdnet_analyzer_settings")
+                            settings = db.get_metadata(SETTINGS_KEY)
                             gr.Info(loc.localize("embeddings-db-already-exists-info"))
 
                             return (

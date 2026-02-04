@@ -10,6 +10,7 @@ from typing import Literal
 import keras
 import numpy as np
 import tensorflow as tf
+from birdnet.acoustic_models.v2_4.pb import AcousticPBDownloaderV2_4
 
 import birdnet_analyzer.config as cfg
 from birdnet_analyzer import utils
@@ -21,7 +22,6 @@ os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 EMPTY_CLASS_EXCEPTION_REF = None
-PBMODEL = None
 
 
 class WrappedSavedModel(keras.layers.Layer):
@@ -601,15 +601,11 @@ def save_linear_classifier(classifier, model_path: str, labels: list[str], mode:
         model_path: Path the model will be saved at.
         labels: List of labels used for the classifier.
     """
-    global PBMODEL  # noqa: PLW0603
-
     if mode not in ("replace", "append"):
         raise ValueError("Model save mode must be either 'replace' or 'append'")
 
-    if PBMODEL is None:
-        PBMODEL = tf.saved_model.load(os.path.join(SCRIPT_DIR, cfg.PB_MODEL))
-
-    saved_model = PBMODEL
+    saved_model_path, _ = AcousticPBDownloaderV2_4.get_model_path_and_labels("en_us")
+    saved_model = tf.saved_model.load(saved_model_path)
     inputs = keras.Input(shape=(144000,), dtype=tf.float32, name="input_audio")
     wrapper = WrappedSavedModel(saved_model.signatures["embeddings"])(inputs)
 
@@ -662,13 +658,11 @@ def save_raven_model(classifier, model_path: str, labels: list[str], mode: Liter
     Returns:
         None
     """
-    global PBMODEL  # noqa: PLW0603
 
-    if PBMODEL is None:
-        PBMODEL = tf.saved_model.load(os.path.join(SCRIPT_DIR, cfg.PB_MODEL))
-
+    saved_model_path, original_labels = AcousticPBDownloaderV2_4.get_model_path_and_labels("en_us")
+    saved_model = tf.saved_model.load(saved_model_path)
     model_cls = custom_models.CombinedModelAppendWithSigmoid if mode == "append" else custom_models.CombinedModelReplaceWithSigmoid
-    combined_model = model_cls(PBMODEL, classifier)
+    combined_model = model_cls(saved_model, classifier)
 
     @tf.function(input_signature=[tf.TensorSpec(shape=[None, 144000], dtype=tf.float32)])  # pyright: ignore[reportCallIssue]
     def basic(inputs):
@@ -678,15 +672,15 @@ def save_raven_model(classifier, model_path: str, labels: list[str], mode: Liter
         "basic": basic,
     }
 
-    # Save signature model
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
+
     model_path = model_path.removesuffix(".tflite")
+
     tf.saved_model.save(combined_model, model_path, signatures=signatures)
 
     if mode == "append":
-        labels = [*utils.read_lines(os.path.join(SCRIPT_DIR, cfg.LABELS_FILE)), *labels]
+        labels = [*original_labels, *labels]
 
-    # Save label file
     labelIds = [label[:4].replace(" ", "") + str(i) for i, label in enumerate(labels, 1)]
     labels_dir = os.path.join(model_path, "labels")
 
@@ -696,17 +690,16 @@ def save_raven_model(classifier, model_path: str, labels: list[str], mode: Liter
         labelwriter = csv.writer(labelsfile)
         labelwriter.writerows(zip(labelIds, labels, strict=True))
 
-    # Save class names file
     classes_dir = os.path.join(model_path, "classes")
 
     os.makedirs(classes_dir, exist_ok=True)
 
     with open(os.path.join(classes_dir, "classes.csv"), "w", newline="") as classesfile:
         classeswriter = csv.writer(classesfile)
+
         for labelId in labelIds:
             classeswriter.writerow((labelId, 0.25, cfg.SIG_FMIN, cfg.SIG_FMAX, False))
 
-    # Save model config
     model_config = os.path.join(model_path, "model_config.json")
 
     with open(model_config, "w") as modelconfigfile:
@@ -734,6 +727,7 @@ def save_raven_model(classifier, model_path: str, labels: list[str], mode: Liter
             ],
             "globalSemanticKeys": labelIds,
         }
+
         json.dump(modelconfig, modelconfigfile, indent=2)
 
         model_params = os.path.join(model_path, "model_params.csv")

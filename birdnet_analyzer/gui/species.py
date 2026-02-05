@@ -23,7 +23,7 @@ def run_species_list(out_path, filename, lat, lon, week, use_yearlong, sf_thresh
         sortby,
     )
 
-    gr.Info(f"{loc.localize('species-tab-finish-info')} {cfg.OUTPUT_PATH}")
+    gr.Info(f"{loc.localize('species-tab-finish-info')} {out_path}")
 
 
 def build_species_tab():

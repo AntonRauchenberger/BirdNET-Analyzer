@@ -18,10 +18,7 @@ RANDOM_SEED: int = 42
 
 MODEL_VERSION: str = "V2.4"
 BIRDNET_MODEL_PATH: str = os.path.join(SCRIPT_DIR, "checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_Model_FP32.tflite")
-PERCH_V2_MODEL_PATH: str = os.path.join(SCRIPT_DIR, "checkpoints/perch_v2")
-MDATA_MODEL_PATH: str = os.path.join(SCRIPT_DIR, "checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_MData_Model_V2_FP16.tflite")
 BIRDNET_LABELS_FILE: str = os.path.join(SCRIPT_DIR, "checkpoints/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels.txt")
-PERCH_LABELS_FILE: str = os.path.join(PERCH_V2_MODEL_PATH, "assets", "labels.csv")
 TRANSLATED_LABELS_PATH: str = os.path.join(SCRIPT_DIR, "labels/V2.4")
 
 ##################
@@ -51,21 +48,8 @@ SIG_FMAX: int = 15000
 BANDPASS_FMIN: int = 0
 BANDPASS_FMAX: int = 15000
 
-# Top N species to display in selection table, ignored if set to None
-TOP_N = None
-
 # Audio speed
 AUDIO_SPEED: float = 1.0
-
-#####################
-# Metadata settings #
-#####################
-
-LATITUDE: float = -1
-LONGITUDE: float = -1
-WEEK: int = -1
-LOCATION_FILTER_THRESHOLD: float = 0.03
-
 
 ###################
 # Search settings #
@@ -82,7 +66,6 @@ CROP_MODES = Literal["center", "first", "segments"]
 # Note: Entries in this list have to match entries from the LABELS_FILE
 # We use the 2024 eBird taxonomy for species names (Clements list)
 CODES_FILE: str = os.path.join(SCRIPT_DIR, "eBird_taxonomy_codes_2024E.json")
-SPECIES_LIST_FILE: str = os.path.join(SCRIPT_DIR, "example/species_list.txt")
 
 # Supported file types
 ALLOWED_FILETYPES: list[str] = ["wav", "flac", "mp3", "ogg", "m4a", "wma", "aiff", "aif"]
@@ -90,10 +73,6 @@ ALLOWED_FILETYPES: list[str] = ["wav", "flac", "mp3", "ogg", "m4a", "wma", "aiff
 # Number of threads to use for inference.
 # Can be as high as number of CPUs in your system
 CPU_THREADS: int = 8
-TFLITE_THREADS: int = 1
-
-# False will output logits, True will convert to sigmoid activations
-SIGMOID_SENSITIVITY: float = 1.0
 
 # Whether to use noise to pad the signal
 # If set to False, the signal will be padded with zeros
@@ -124,42 +103,7 @@ SAMPLE_CROP_MODES = Literal["center", "first", "segments", "smart"]
 NON_EVENT_CLASSES: list[str] = ["noise", "other", "background", "silence"]
 
 # Upsampling settings
-UPSAMPLING_RATIO: float = 0.0
 UPSAMPLING_MODES = Literal["repeat", "mean", "smote"]
-
-# Number of epochs to train for
-TRAIN_EPOCHS: int = 50
-
-# Batch size for training
-TRAIN_BATCH_SIZE: int = 32
-
-# Validation split (percentage)
-TRAIN_VAL_SPLIT: float = 0.2
-
-# Learning rate for training
-TRAIN_LEARNING_RATE: float = 0.0001
-
-# Number of hidden units in custom classifier
-# If >0, a two-layer classifier will be trained
-TRAIN_HIDDEN_UNITS: int = 0
-
-# Dropout rate for training
-TRAIN_DROPOUT: float = 0.0
-
-# Whether to use mixup for training
-TRAIN_WITH_MIXUP: bool = False
-
-# Whether to apply label smoothing for training
-TRAIN_WITH_LABEL_SMOOTHING: bool = False
-
-# Whether to use focal loss for training
-TRAIN_WITH_FOCAL_LOSS: bool = False
-
-# Focal loss gamma parameter
-FOCAL_LOSS_GAMMA: float = 2.0
-
-# Focal loss alpha parameter
-FOCAL_LOSS_ALPHA: float = 0.25
 
 # Model output format
 TRAINED_MODEL_OUTPUT_FORMATS = Literal["tflite", "raven", "both"]
@@ -167,64 +111,8 @@ TRAINED_MODEL_OUTPUT_FORMATS = Literal["tflite", "raven", "both"]
 # Model save mode (replace or append new classifier)
 TRAINED_MODEL_SAVE_MODES = Literal["replace", "append"]
 
-# Cache settings
-TRAIN_CACHE_MODE: str | None = None
-TRAIN_CACHE_FILE: str = "train_cache.npz"
-
-# Use automatic Hyperparameter tuning
-AUTOTUNE: bool = False
-
-# How many trials are done for the hyperparameter tuning
-AUTOTUNE_TRIALS: int = 50
-
-# How many executions per trial are done for the hyperparameter tuning
-# Mutliple executions will be averaged, so the evaluation is more consistent
-AUTOTUNE_EXECUTIONS_PER_TRIAL: int = 1
-
-# If a binary classification model is trained.
-# This value will be detected automatically in the training script, if only one class and a non-event class is used.
-BINARY_CLASSIFICATION: bool = False
-
-# If a model for a multi-label setting is trained.
-# This value will automatically be set, if subfolders in the input direcotry are named with multiple classes separated by commas.
-MULTI_LABEL: bool = False
-
 ################
 # Runtime vars #
 ################
 
-# File input path and output path for selection tables
-INPUT_PATH: str = ""
-OUTPUT_PATH: str = ""
-
-# Training data path
-TRAIN_DATA_PATH: str = ""
-TEST_DATA_PATH: str = ""
-
-LABELS: list[str] = []
-TRANSLATED_LABELS: list[str] = []
-SPECIES_LIST: list[str] = []
 ERROR_LOG_FILE: str = os.path.join(SCRIPT_DIR, "error_log.txt")
-FILE_STORAGE_PATH: str = ""
-
-# Path to custom trained classifier
-# If None, no custom classifier will be used
-# Make sure to set the LABELS_FILE above accordingly
-CUSTOM_CLASSIFIER: str | None = None
-MODEL_PATH: str | None = None
-LABELS_FILE: str | None = None
-SAMPLE_RATE: int | None = None
-SIG_LENGTH: float | None = None
-
-######################
-# Get and set config #
-######################
-
-
-def get_config():
-    return {k: v for k, v in globals().items() if k.isupper()}
-
-
-def set_config(c: dict):
-    for k, v in c.items():
-        globals()[k] = v

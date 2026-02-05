@@ -309,7 +309,7 @@ def build_train_tab():
                     (loc.localize("training-tab-cache-mode-radio-option-load"), "load"),
                     (loc.localize("training-tab-cache-mode-radio-option-save"), "save"),
                 ],
-                value=cfg.TRAIN_CACHE_MODE,
+                value=None,
                 label=loc.localize("training-tab-cache-mode-radio-label"),
                 info=loc.localize("training-tab-cache-mode-radio-info"),
             )
@@ -447,20 +447,20 @@ def build_train_tab():
             )
 
         autotune_cb = gr.Checkbox(
-            cfg.AUTOTUNE,
+            False,
             label=loc.localize("training-tab-autotune-checkbox-label"),
             info=loc.localize("training-tab-autotune-checkbox-info"),
         )
 
         with gr.Column(visible=False) as autotune_params, gr.Row():
             autotune_trials = gr.Number(
-                cfg.AUTOTUNE_TRIALS,
+                50,
                 label=loc.localize("training-tab-autotune-trials-number-label"),
                 info=loc.localize("training-tab-autotune-trials-number-info"),
                 minimum=1,
             )
             autotune_executions_per_trials = gr.Number(
-                cfg.AUTOTUNE_EXECUTIONS_PER_TRIAL,
+                1,
                 minimum=1,
                 label=loc.localize("training-tab-autotune-executions-number-label"),
                 info=loc.localize("training-tab-autotune-executions-number-info"),
@@ -469,7 +469,7 @@ def build_train_tab():
         with gr.Column() as custom_params:
             with gr.Row():
                 epoch_number = gr.Number(
-                    cfg.TRAIN_EPOCHS,
+                    50,
                     minimum=1,
                     step=1,
                     label=loc.localize("training-tab-epochs-number-label"),
@@ -483,7 +483,7 @@ def build_train_tab():
                     info=loc.localize("training-tab-batchsize-number-info"),
                 )
                 learning_rate_number = gr.Number(
-                    cfg.TRAIN_LEARNING_RATE,
+                    0.0001,
                     minimum=0.0001,
                     step=0.0001,
                     label=loc.localize("training-tab-learningrate-number-label"),
@@ -492,14 +492,14 @@ def build_train_tab():
 
             with gr.Row():
                 hidden_units_number = gr.Number(
-                    cfg.TRAIN_HIDDEN_UNITS,
+                    0,
                     minimum=0,
                     step=64,
                     label=loc.localize("training-tab-hiddenunits-number-label"),
                     info=loc.localize("training-tab-hiddenunits-number-info"),
                 )
                 dropout_number = gr.Number(
-                    cfg.TRAIN_DROPOUT,
+                    0.0,
                     minimum=0.0,
                     maximum=0.9,
                     step=0.1,
@@ -507,7 +507,7 @@ def build_train_tab():
                     info=loc.localize("training-tab-dropout-number-info"),
                 )
                 use_label_smoothing = gr.Checkbox(
-                    cfg.TRAIN_WITH_LABEL_SMOOTHING,
+                    False,
                     label=loc.localize("training-tab-use-labelsmoothing-checkbox-label"),
                     info=loc.localize("training-tab-use-labelsmoothing-checkbox-info"),
                     show_label=True,
@@ -536,13 +536,13 @@ def build_train_tab():
 
             with gr.Row():
                 use_mixup = gr.Checkbox(
-                    cfg.TRAIN_WITH_MIXUP,
+                    False,
                     label=loc.localize("training-tab-use-mixup-checkbox-label"),
                     info=loc.localize("training-tab-use-mixup-checkbox-info"),
                     show_label=True,
                 )
                 use_focal_loss = gr.Checkbox(
-                    cfg.TRAIN_WITH_FOCAL_LOSS,
+                    False,
                     label=loc.localize("training-tab-use-focal-loss-checkbox-label"),
                     info=loc.localize("training-tab-use-focal-loss-checkbox-info"),
                     show_label=True,
@@ -552,7 +552,7 @@ def build_train_tab():
             focal_loss_gamma = gr.Slider(
                 minimum=0.5,
                 maximum=5.0,
-                value=cfg.FOCAL_LOSS_GAMMA,
+                value=2.0,
                 step=0.1,
                 label=loc.localize("training-tab-focal-loss-gamma-slider-label"),
                 info=loc.localize("training-tab-focal-loss-gamma-slider-info"),
@@ -561,7 +561,7 @@ def build_train_tab():
             focal_loss_alpha = gr.Slider(
                 minimum=0.1,
                 maximum=0.9,
-                value=cfg.FOCAL_LOSS_ALPHA,
+                value=0.25,
                 step=0.05,
                 label=loc.localize("training-tab-focal-loss-alpha-slider-label"),
                 info=loc.localize("training-tab-focal-loss-alpha-slider-info"),

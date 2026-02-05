@@ -80,7 +80,7 @@ def io_args():
     Returns:
         argparse.ArgumentParser: The argument parser with input and output path arguments.
     Arguments:
-        input (str): Path to the input file or folder. Defaults to the value specified in cfg.INPUT_PATH.
+        input (str): Path to the input file or folder.
         output (str): Path to the output folder. Defaults to the input path if not specified.
     """
     p = argparse.ArgumentParser(add_help=False)
@@ -135,7 +135,6 @@ def species_list_args():
             --slist (str): Path to species list file or folder. If folder is provided, species list needs to be named
                            "species_list.txt". If lat and lon are provided, this list will be ignored.
             --sf_thresh (float): Minimum species occurrence frequency threshold for location filter. Values in [0.01, 0.99].
-                                 Defaults to cfg.LOCATION_FILTER_THRESHOLD.
     """
     p = argparse.ArgumentParser(add_help=False)
 
@@ -149,7 +148,7 @@ def species_list_args():
     p.add_argument(
         "--sf_thresh",
         type=lambda a: max(0.0001, min(0.99, float(a))),
-        default=cfg.LOCATION_FILTER_THRESHOLD,
+        default=0.03,
         help="Minimum species occurrence frequency threshold for location filter. Values in [0.0001, 0.99].",
     )
 
@@ -166,7 +165,6 @@ def species_args():
             --week (int): Week of the year when the recording was made. Values in [1, 48] (4 weeks per month).
                           Set -1 for year-round species list. Default is -1.
             --sf_thresh (float): Minimum species occurrence frequency threshold for location filter. Values in [0.01, 0.99].
-                                 Defaults to cfg.LOCATION_FILTER_THRESHOLD.
             --slist (str): Path to species list file or folder. If folder is provided, species list needs to be named
                            "species_list.txt". If lat and lon are provided, this list will be ignored.
     """
@@ -185,8 +183,7 @@ def sigmoid_args():
     Creates an argument parser for sigmoid sensitivity.
     This function sets up an argument parser with a single argument `--sensitivity`.
     The sensitivity value is constrained to be within the range [0.5, 1.5], where higher
-    values result in higher detection sensitivity. The default value is taken from
-    `cfg.SIGMOID_SENSITIVITY`.
+    values result in higher detection sensitivity.
     Returns:
         argparse.ArgumentParser: The argument parser with the sensitivity argument configured.
     """
@@ -195,7 +192,7 @@ def sigmoid_args():
     p.add_argument(
         "--sensitivity",
         type=lambda a: min(1.5, max(0.5, float(a))),
-        default=cfg.SIGMOID_SENSITIVITY,
+        default=1.0,
         help="Detection sensitivity; Higher values result in higher sensitivity. Values in [0.5, 1.5]. Values other than 1.0 will shift the sigmoid functionon the x-axis. Use complementary to the cut-off threshold.",
     )
 
@@ -449,7 +446,6 @@ def analyzer_parser():
     parser.add_argument(
         "-c",
         "--classifier",
-        default=cfg.CUSTOM_CLASSIFIER,
         help="Path to custom trained classifier. If set, --lat, --lon and --locale are ignored.",
     )
     parser.add_argument(
@@ -591,7 +587,7 @@ def segments_parser():
             - results (str, optional): Path to folder containing result files. Defaults to the `input` path.
             - output (str, optional): Output folder path for extracted segments. Defaults to the `input` path.
             - max_segments (int, optional): Number of randomly extracted segments per species. Defaults to 100.
-            - seg_length (float, optional): Length of extracted segments in seconds. Defaults to cfg.SIG_LENGTH.
+            - seg_length (float, optional): Length of extracted segments in seconds.
     """
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -610,7 +606,7 @@ def segments_parser():
     parser.add_argument(
         "--seg_length",
         type=lambda a: max(1.0, float(a)),
-        default=cfg.BIRDNET_SIG_LENGTH,
+        default=3.0,
         help="Minimum length of extracted segments in seconds. If a segment is shorter than this value, it will be padded with audio from the source file.",
     )
     parser.add_argument(
@@ -704,7 +700,7 @@ def train_parser():
             bandpass_args(),
             audio_speed_args(),
             threads_args(),
-            bs_args(cfg.TRAIN_BATCH_SIZE),
+            bs_args(32),
             overlap_args(help_string="Overlap of training data segments in seconds if crop_mode is 'segments'."),
         ],
     )
@@ -730,19 +726,19 @@ def train_parser():
     parser.add_argument(
         "--epochs",
         type=int,
-        default=cfg.TRAIN_EPOCHS,
+        default=50,
         help="Number of training epochs.",
     )
     parser.add_argument(
         "--val_split",
         type=float,
-        default=cfg.TRAIN_VAL_SPLIT,
+        default=0.2,
         help="Validation split ratio. Will be ignored if test_data is set.",
     )
     parser.add_argument(
         "--learning_rate",
         type=float,
-        default=cfg.TRAIN_LEARNING_RATE,
+        default=0.0001,
         help="Learning rate.",
     )
     parser.add_argument(
@@ -753,26 +749,26 @@ def train_parser():
     )
     parser.add_argument(
         "--focal-loss-gamma",
-        default=cfg.FOCAL_LOSS_GAMMA,
+        default=2.0,
         type=float,
         help="Focal loss gamma parameter (focusing parameter). Higher values give more weight to hard examples.",
     )
     parser.add_argument(
         "--focal-loss-alpha",
-        default=cfg.FOCAL_LOSS_ALPHA,
+        default=0.25,
         type=float,
         help="Focal loss alpha parameter (balancing parameter). Controls weight between positive and negative examples.",
     )
     parser.add_argument(
         "--hidden_units",
         type=int,
-        default=cfg.TRAIN_HIDDEN_UNITS,
+        default=0,
         help="Number of hidden units. If set to >0, a two-layer classifier is used.",
     )
     parser.add_argument(
         "--dropout",
         type=lambda a: min(max(0, float(a)), 0.9),
-        default=cfg.TRAIN_DROPOUT,
+        default=0.0,
         help="Dropout rate. Higher values result in more regularization. Values in [0.0, 0.9].",
     )
     parser.add_argument("--label_smoothing", action="store_true", help="Whether to use label smoothing for training.")
@@ -780,7 +776,7 @@ def train_parser():
     parser.add_argument(
         "--upsampling_ratio",
         type=lambda a: min(max(0, float(a)), 1),
-        default=cfg.UPSAMPLING_RATIO,
+        default=0.0,
         help="Balance train data and upsample minority classes. Values between 0 and 1.",
     )
     parser.add_argument(
@@ -802,7 +798,7 @@ def train_parser():
         help="Model save mode. 'replace' will overwrite the original classification layer and 'append' will combine the original classification layer with the new one.",
     )
     parser.add_argument("--cache_mode", choices=["load", "save"], help="Cache mode. Can be 'load' or 'save'.")
-    parser.add_argument("--cache_file", default=cfg.TRAIN_CACHE_FILE, help="Path to cache file.")
+    parser.add_argument("--cache_file", default="train_cache.npz", help="Path to cache file.")
     parser.add_argument(
         "--autotune",
         action="store_true",
@@ -811,13 +807,13 @@ def train_parser():
     parser.add_argument(
         "--autotune_trials",
         type=int,
-        default=cfg.AUTOTUNE_TRIALS,
+        default=50,
         help="Number of training runs for hyperparameter tuning.",
     )
     parser.add_argument(
         "--autotune_executions_per_trial",
         type=int,
-        default=cfg.AUTOTUNE_EXECUTIONS_PER_TRIAL,
+        default=1,
         help="The number of times a training run with a set of hyperparameters is repeated during hyperparameter tuning (this reduces the variance).",
     )
 

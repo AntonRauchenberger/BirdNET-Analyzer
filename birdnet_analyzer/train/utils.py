@@ -119,7 +119,7 @@ def _load_training_data(
 ):
     """Loads the data for training.
 
-    Reads all subdirectories of "config.TRAIN_DATA_PATH" and uses their names as new labels.
+    Reads all subdirectories of "audio_input" and uses their names as new labels.
 
     These directories should contain all the training data for each label.
 
@@ -458,6 +458,8 @@ def train_model(
                             parent_name="focal_loss",
                             parent_values=[True],
                         ),  # type: ignore
+                        is_binary_classification=is_binary,
+                        is_multi_label=is_multi_label,
                     )
 
                     # Get the best validation AUPRC instead of loss
@@ -531,6 +533,8 @@ def train_model(
             focal_loss_gamma=focal_loss_gamma,
             focal_loss_alpha=focal_loss_alpha,
             on_epoch_end=on_epoch_end,
+            is_binary_classification=is_binary,
+            is_multi_label=is_multi_label,
         )
     except model.get_empty_class_exception() as e:
         e.message = f"Class with label {labels[e.index]} is empty. Please remove it from the training data."  # type: ignore
@@ -542,14 +546,50 @@ def train_model(
     try:
         # Remove activation from last layer before saving
         classifier.pop()
+        params = (
+            [
+                "Hidden units",
+                "Dropout",
+                "Batchsize",
+                "Learning rate",
+                "Crop mode",
+                "Crop overlap",
+                "Audio speed",
+                "Upsampling mode",
+                "Upsampling ratio",
+                "use mixup",
+                "use label smoothing",
+                "use focal loss",
+                "focal loss alpha",
+                "focal loss gamma",
+                "BirdNET Model version",
+            ],
+            [
+                hidden_units,
+                dropout,
+                batch_size,
+                learning_rate,
+                crop_mode,
+                overlap,
+                audio_speed,
+                upsampling_mode,
+                upsampling_ratio,
+                mixup,
+                label_smoothing,
+                use_focal_loss,
+                focal_loss_alpha,
+                focal_loss_gamma,
+                "2.4",
+            ],
+        )
 
         if model_format == "both":
-            model.save_raven_model(classifier, output, labels, mode=model_save_mode)
-            model.save_linear_classifier(classifier, output, labels, mode=model_save_mode)
+            model.save_raven_model(classifier, output, labels, mode=model_save_mode, params=params)
+            model.save_linear_classifier(classifier, output, labels, mode=model_save_mode, params=params)
         elif model_format == "tflite":
-            model.save_linear_classifier(classifier, output, labels, mode=model_save_mode)
+            model.save_linear_classifier(classifier, output, labels, mode=model_save_mode, params=params)
         elif model_format == "raven":
-            model.save_raven_model(classifier, output, labels, mode=model_save_mode)
+            model.save_raven_model(classifier, output, labels, mode=model_save_mode, params=params)
         else:
             raise ValueError(f"Unknown model output format: {model_format}")
     except Exception as e:

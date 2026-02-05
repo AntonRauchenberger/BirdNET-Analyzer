@@ -1,24 +1,28 @@
 # pyright: reportOptionalMemberAccess=false
 """Contains functions to use the BirdNET models."""
 
+from __future__ import annotations
+
 import csv
 import json
 import logging
 import os
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import keras
 import numpy as np
 import tensorflow as tf
 from birdnet.acoustic_models.v2_4.pb import AcousticPBDownloaderV2_4
 
-import birdnet_analyzer.config as cfg
 from birdnet_analyzer import utils
+from birdnet_analyzer.config import RANDOM_SEED
 from birdnet_analyzer.train import custom_models
+
+if TYPE_CHECKING:
+    from numpy.random import Generator
 
 tf.get_logger().setLevel("ERROR")
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 EMPTY_CLASS_EXCEPTION_REF = None
@@ -78,7 +82,7 @@ def label_smoothing(y: np.ndarray, alpha=0.1):
     return y
 
 
-def mixup(x, y, augmentation_ratio=0.25, alpha=0.2):
+def mixup(x, y, rng: Generator, augmentation_ratio=0.25, alpha=0.2):
     """Apply mixup to the given data.
 
     Mixup is a data augmentation technique that generates new samples by
@@ -87,13 +91,13 @@ def mixup(x, y, augmentation_ratio=0.25, alpha=0.2):
     Args:
         x: Samples.
         y: One-hot labels.
+        rng: Random number generator.
         augmentation_ratio: The ratio of augmented samples.
         alpha: The beta distribution parameter.
 
     Returns:
         Augmented data.
     """
-    rng = np.random.default_rng(cfg.RANDOM_SEED)
     positive_indices = np.unique(np.where(y[:, :] == 1)[0])
     num_samples_to_augment = int(len(positive_indices) * augmentation_ratio)
     mixed_up_indices = []
@@ -126,7 +130,7 @@ def mixup(x, y, augmentation_ratio=0.25, alpha=0.2):
     return x, y
 
 
-def random_split(x, y, val_ratio=0.2):
+def random_split(x, y, rng: Generator, val_ratio=0.2):
     """Splits the data into training and validation data.
 
     Makes sure that each class is represented in both sets.
@@ -134,12 +138,12 @@ def random_split(x, y, val_ratio=0.2):
     Args:
         x: Samples.
         y: One-hot labels.
+        rng: Random number generator.
         val_ratio: The ratio of validation data.
 
     Returns:
         A tuple of (x_train, y_train, x_val, y_val).
     """
-    rng = np.random.default_rng(cfg.RANDOM_SEED)
     num_classes = y.shape[1]
     x_train, y_train, x_val, y_val = [], [], [], []
 
@@ -201,7 +205,7 @@ def random_split(x, y, val_ratio=0.2):
     return x_train, y_train, x_val, y_val
 
 
-def random_multilabel_split(x, y, val_ratio=0.2):
+def random_multilabel_split(x, y, rng: Generator, val_ratio=0.2):
     """Splits the data into training and validation data.
 
     Makes sure that each combination of classes is represented in both sets.
@@ -209,13 +213,13 @@ def random_multilabel_split(x, y, val_ratio=0.2):
     Args:
         x: Samples.
         y: One-hot labels.
+        rng: Random number generator.
         val_ratio: The ratio of validation data.
 
     Returns:
         A tuple of (x_train, y_train, x_val, y_val).
 
     """
-    rng = np.random.default_rng(cfg.RANDOM_SEED)
     class_combinations = np.unique(y, axis=0)
     x_train, y_train, x_val, y_val = [], [], [], []
 
@@ -258,23 +262,24 @@ def random_multilabel_split(x, y, val_ratio=0.2):
     return x_train, y_train, x_val, y_val
 
 
-def upsample_core(x: np.ndarray, y: np.ndarray, min_samples: int, apply, size=2):
+def upsample_core(x: np.ndarray, y: np.ndarray, min_samples: int, rng: Generator, apply, is_binary: bool, size=2):
     """
     Upsamples the minority class in the dataset using the specified apply function.
     Parameters:
         x (np.ndarray): The feature matrix.
         y (np.ndarray): The target labels.
         min_samples (int): The minimum number of samples required for the minority class.
+        rng (Generator): A random number generator.
         apply (callable): A function that applies the SMOTE or any other algorithm to the data.
+        is_binary (bool): Whether the classification is binary.
         size (int, optional): The number of samples to generate in each iteration. Default is 2.
     Returns:
         tuple: A tuple containing the upsampled feature matrix and target labels.
     """
-    rng = np.random.default_rng(cfg.RANDOM_SEED)
     y_temp = []
     x_temp = []
 
-    if cfg.BINARY_CLASSIFICATION:
+    if is_binary:
         minority_label = 1 if y.sum(axis=0) < len(y) - y.sum(axis=0) else 0
 
         while np.where(y == minority_label)[0].shape[0] + len(y_temp) < min_samples:
@@ -299,7 +304,7 @@ def upsample_core(x: np.ndarray, y: np.ndarray, min_samples: int, apply, size=2)
     return x_temp, y_temp
 
 
-def upsampling(x: np.ndarray, y: np.ndarray, ratio=0.5, mode="repeat"):
+def upsampling(x: np.ndarray, y: np.ndarray, rng: Generator, is_binary: bool, ratio=0.5, mode="repeat"):
     """Balance data through upsampling.
 
     We upsample minority classes to have at least 10% (ratio=0.1) of the samples of the majority class.
@@ -307,14 +312,15 @@ def upsampling(x: np.ndarray, y: np.ndarray, ratio=0.5, mode="repeat"):
     Args:
         x: Samples.
         y: One-hot labels.
+        rng: Random number generator.
+        is_binary: Whether the classification is binary.
         ratio: The minimum ratio of minority to majority samples.
         mode: The upsampling mode. Either 'repeat', 'mean', 'linear' or 'smote'.
 
     Returns:
         Upsampled data.
     """
-    rng = np.random.default_rng(cfg.RANDOM_SEED)
-    min_samples = int(max(y.sum(axis=0), len(y) - y.sum(axis=0)) * ratio) if cfg.BINARY_CLASSIFICATION else int(np.max(y.sum(axis=0)) * ratio)
+    min_samples = int(max(y.sum(axis=0), len(y) - y.sum(axis=0)) * ratio) if is_binary else int(np.max(y.sum(axis=0)) * ratio)
     x_temp = []
     y_temp = []
 
@@ -323,7 +329,7 @@ def upsampling(x: np.ndarray, y: np.ndarray, ratio=0.5, mode="repeat"):
         def applyRepeat(x, y, random_index):
             return x[random_index[0]], y[random_index[0]]
 
-        x_temp, y_temp = upsample_core(x, y, min_samples, applyRepeat, size=1)
+        x_temp, y_temp = upsample_core(x, y, min_samples, rng, applyRepeat, is_binary, size=1)
 
     elif mode == "mean":
 
@@ -332,8 +338,7 @@ def upsampling(x: np.ndarray, y: np.ndarray, ratio=0.5, mode="repeat"):
 
             return mean, y[random_indices[0]]
 
-        x_temp, y_temp = upsample_core(x, y, min_samples, applyMean)
-
+        x_temp, y_temp = upsample_core(x, y, min_samples, rng, applyMean, is_binary)
     elif mode == "linear":
 
         def applyLinearCombination(x, y, random_indices):
@@ -342,7 +347,7 @@ def upsampling(x: np.ndarray, y: np.ndarray, ratio=0.5, mode="repeat"):
 
             return new_sample, y[random_indices[0]]
 
-        x_temp, y_temp = upsample_core(x, y, min_samples, applyLinearCombination)
+        x_temp, y_temp = upsample_core(x, y, min_samples, rng, applyLinearCombination, is_binary)
 
     elif mode == "smote":
 
@@ -356,7 +361,7 @@ def upsampling(x: np.ndarray, y: np.ndarray, ratio=0.5, mode="repeat"):
 
             return new_sample, y[random_index[0]]
 
-        x_temp, y_temp = upsample_core(x, y, min_samples, applySmote, size=1)
+        x_temp, y_temp = upsample_core(x, y, min_samples, rng, applySmote, is_binary, size=1)
 
     if len(x_temp) > 0:
         x = np.vstack((x, np.array(x_temp)))
@@ -371,51 +376,6 @@ def upsampling(x: np.ndarray, y: np.ndarray, ratio=0.5, mode="repeat"):
     del y_temp
 
     return x, y
-
-
-def save_model_params(path):
-    """Saves the model parameters to a file.
-
-    Args:
-        path: Path to the file.
-    """
-    utils.save_params_to_file(
-        path,
-        (
-            "Hidden units",
-            "Dropout",
-            "Batchsize",
-            "Learning rate",
-            "Crop mode",
-            "Crop overlap",
-            "Audio speed",
-            "Upsampling mode",
-            "Upsampling ratio",
-            "use mixup",
-            "use label smoothing",
-            "use focal loss",
-            "focal loss alpha",
-            "focal loss gamma",
-            "BirdNET Model version",
-        ),
-        (
-            cfg.TRAIN_HIDDEN_UNITS,
-            cfg.TRAIN_DROPOUT,
-            cfg.TRAIN_BATCH_SIZE,
-            cfg.TRAIN_LEARNING_RATE,
-            cfg.SAMPLE_CROP_MODE,
-            cfg.SIG_OVERLAP,
-            cfg.AUDIO_SPEED,
-            cfg.UPSAMPLING_MODE,
-            cfg.UPSAMPLING_RATIO,
-            cfg.TRAIN_WITH_MIXUP,
-            cfg.TRAIN_WITH_LABEL_SMOOTHING,
-            cfg.TRAIN_WITH_FOCAL_LOSS,
-            cfg.FOCAL_LOSS_ALPHA,
-            cfg.FOCAL_LOSS_GAMMA,
-            cfg.MODEL_VERSION,
-        ),
-    )
 
 
 def build_linear_classifier(num_labels, input_size, hidden_units=0, dropout=0.0):
@@ -467,6 +427,8 @@ def train_linear_classifier(
     train_with_focal_loss=False,
     focal_loss_gamma=2.0,
     focal_loss_alpha=0.25,
+    is_multi_label=False,
+    is_binary_classification=False,
     on_epoch_end=None,
 ):
     """Trains a custom classifier.
@@ -490,11 +452,15 @@ def train_linear_classifier(
         train_with_focal_loss: If True, uses focal loss instead of binary cross-entropy loss.
         focal_loss_gamma: Focal loss gamma parameter.
         focal_loss_alpha: Focal loss alpha parameter.
+        is_multi_label: If True, multi-label classification is used.
+        is_binary_classification: If True, binary classification is used.
         on_epoch_end: Optional callback `function(epoch, logs)`.
 
     Returns:
         (classifier, history)
     """
+    setting_cache = os.environ["CUDA_VISIBLE_DEVICES"]
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
     class FunctionCallback(keras.callbacks.Callback):
         def __init__(self, on_epoch_end=None) -> None:
@@ -505,34 +471,28 @@ def train_linear_classifier(
             if self.on_epoch_end_fn:
                 self.on_epoch_end_fn(epoch, logs)
 
-    rng = np.random.default_rng(cfg.RANDOM_SEED)
+    rng = np.random.default_rng(RANDOM_SEED)
     idx = np.arange(x_train.shape[0])
     rng.shuffle(idx)
     x_train = x_train[idx]
     y_train = y_train[idx]
 
     if val_split > 0:
-        if not cfg.MULTI_LABEL:
-            x_train, y_train, x_val, y_val = random_split(x_train, y_train, val_split)
+        if not is_multi_label:
+            x_train, y_train, x_val, y_val = random_split(x_train, y_train, rng, val_split)
         else:
-            x_train, y_train, x_val, y_val = random_multilabel_split(x_train, y_train, val_split)
+            x_train, y_train, x_val, y_val = random_multilabel_split(x_train, y_train, rng, val_split)
     else:
         x_val = x_test
         y_val = y_test
 
-    print(
-        f"Training on {x_train.shape[0]} samples, validating on {x_val.shape[0]} samples.",
-        flush=True,
-    )
-
     if upsampling_ratio > 0:
-        x_train, y_train = upsampling(x_train, y_train, upsampling_ratio, upsampling_mode)
-        print(f"Upsampled training data to {x_train.shape[0]} samples.", flush=True)
+        x_train, y_train = upsampling(x_train, y_train, rng, upsampling_ratio, upsampling_mode)
 
-    if train_with_mixup and not cfg.BINARY_CLASSIFICATION:
-        x_train, y_train = mixup(x_train, y_train)
+    if train_with_mixup and not is_binary_classification:
+        x_train, y_train = mixup(x_train, y_train, rng)
 
-    if train_with_label_smoothing and not cfg.BINARY_CLASSIFICATION:
+    if train_with_label_smoothing and not is_binary_classification:
         y_train = label_smoothing(y_train)
 
     patience = min(10, max(5, int(epochs / 10)))
@@ -544,7 +504,7 @@ def train_linear_classifier(
             mode="min",
             patience=patience,
             verbose=1,
-            min_delta=min_delta,
+            min_delta=min_delta,  # type: ignore
             restore_best_weights=True,
         ),
         FunctionCallback(on_epoch_end=on_epoch_end),
@@ -573,16 +533,16 @@ def train_linear_classifier(
         metrics=[
             keras.metrics.AUC(
                 curve="PR",
-                multi_label=cfg.MULTI_LABEL,
+                multi_label=is_multi_label,
                 name="AUPRC",
-                num_labels=y_train.shape[1] if cfg.MULTI_LABEL else None,
+                num_labels=y_train.shape[1] if is_multi_label else None,
                 from_logits=True,
             ),
             keras.metrics.AUC(
                 curve="ROC",
-                multi_label=cfg.MULTI_LABEL,
+                multi_label=is_multi_label,
                 name="AUROC",
-                num_labels=y_train.shape[1] if cfg.MULTI_LABEL else None,
+                num_labels=y_train.shape[1] if is_multi_label else None,
                 from_logits=True,
             ),
         ],
@@ -590,10 +550,14 @@ def train_linear_classifier(
 
     history = classifier.fit(x_train, y_train, epochs=epochs, batch_size=batch_size, validation_data=(x_val, y_val), callbacks=callbacks)
 
+    os.environ["CUDA_VISIBLE_DEVICES"] = setting_cache
+
     return classifier, history
 
 
-def save_linear_classifier(classifier, model_path: str, labels: list[str], mode: Literal["replace", "append"] = "replace"):
+def save_linear_classifier(
+    classifier, model_path: str, labels: list[str], mode: Literal["replace", "append"] = "replace", params: tuple[list[str], list] | None = None
+):
     """Saves the classifier as a tflite model, as well as the used labels in a .txt.
 
     Args:
@@ -604,7 +568,7 @@ def save_linear_classifier(classifier, model_path: str, labels: list[str], mode:
     if mode not in ("replace", "append"):
         raise ValueError("Model save mode must be either 'replace' or 'append'")
 
-    saved_model_path, _ = AcousticPBDownloaderV2_4.get_model_path_and_labels("en_us")
+    saved_model_path, original_labels = AcousticPBDownloaderV2_4.get_model_path_and_labels("en_us")
     saved_model = tf.saved_model.load(saved_model_path)
     inputs = keras.Input(shape=(144000,), dtype=tf.float32, name="input_audio")
     wrapper = WrappedSavedModel(saved_model.signatures["embeddings"])(inputs)
@@ -617,14 +581,11 @@ def save_linear_classifier(classifier, model_path: str, labels: list[str], mode:
 
     combined_model = keras.Model(inputs=inputs, outputs=output, name="basic")
 
-    # Append .tflite if necessary
     if not model_path.endswith(".tflite"):
         model_path += ".tflite"
 
-    # Make folders
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
 
-    # Save model as tflite
     converter = tf.lite.TFLiteConverter.from_keras_model(combined_model)
     tflite_model: bytes = converter.convert()
 
@@ -632,16 +593,25 @@ def save_linear_classifier(classifier, model_path: str, labels: list[str], mode:
         f.write(tflite_model)
 
     if mode == "append":
-        labels = [*utils.read_lines(os.path.join(SCRIPT_DIR, cfg.LABELS_FILE)), *labels]
+        labels = [*original_labels, *labels]
 
-    # Save labels
     with open(model_path.replace(".tflite", "_Labels.txt"), "w", encoding="utf-8") as f:
         f.writelines(label + "\n" for label in labels)
 
-    save_model_params(model_path.replace(".tflite", "_Params.csv"))
+    if params:
+        utils.save_params_to_file(model_path.replace(".tflite", "_Params.csv"), *params)
 
 
-def save_raven_model(classifier, model_path: str, labels: list[str], mode: Literal["replace", "append"] = "replace"):
+def save_raven_model(
+    classifier,
+    model_path: str,
+    labels: list[str],
+    mode: Literal["replace", "append"] = "replace",
+    sig_fmin=0,
+    sig_fmax=15000,
+    model_version="2.4",
+    params: tuple[list[str], list] | None = None,
+):
     """
     Save a TensorFlow model with a custom classifier and associated metadata for use with BirdNET.
 
@@ -698,7 +668,7 @@ def save_raven_model(classifier, model_path: str, labels: list[str], mode: Liter
         classeswriter = csv.writer(classesfile)
 
         for labelId in labelIds:
-            classeswriter.writerow((labelId, 0.25, cfg.SIG_FMIN, cfg.SIG_FMAX, False))
+            classeswriter.writerow((labelId, 0.25, sig_fmin, sig_fmax, False))
 
     model_config = os.path.join(model_path, "model_config.json")
 
@@ -706,7 +676,7 @@ def save_raven_model(classifier, model_path: str, labels: list[str], mode: Liter
         modelconfig = {
             "specVersion": 1,
             "modelDescription": "Custom classifier trained with BirdNET "
-            + cfg.MODEL_VERSION
+            + model_version
             + " embeddings.\n"
             + "BirdNET was developed by the K. Lisa Yang Center for Conservation Bioacoustics"
             + "at the Cornell Lab of Ornithology in collaboration with Chemnitz University of Technology.\n\n"
@@ -732,7 +702,8 @@ def save_raven_model(classifier, model_path: str, labels: list[str], mode: Liter
 
         model_params = os.path.join(model_path, "model_params.csv")
 
-        save_model_params(model_params)
+        if params:
+            utils.save_params_to_file(model_params, *params)
 
 
 def focal_loss(y_true, y_pred, gamma=2.0, alpha=0.25, epsilon=1e-7):
@@ -752,11 +723,13 @@ def focal_loss(y_true, y_pred, gamma=2.0, alpha=0.25, epsilon=1e-7):
     Returns:
         Focal loss value.
     """
+    y_false = 1 - y_true
+    y_false_pred = 1 - y_pred
     y_pred = tf.clip_by_value(y_pred, epsilon, 1.0 - epsilon)
-    cross_entropy = -y_true * tf.math.log(y_pred) - (1 - y_true) * tf.math.log(1 - y_pred)
-    p_t = y_true * y_pred + (1 - y_true) * (1 - y_pred)
+    cross_entropy = -y_true * tf.math.log(y_pred) - y_false * tf.math.log(y_false_pred)
+    p_t = y_true * y_pred + y_false * y_false_pred
     focal_weight = tf.pow(1 - p_t, gamma)
-    alpha_factor = y_true * alpha + (1 - y_true) * (1 - alpha)
+    alpha_factor = y_true * alpha + y_false * (1 - alpha)
     focal_loss = alpha_factor * focal_weight * cross_entropy
 
     return tf.reduce_sum(focal_loss, axis=-1)

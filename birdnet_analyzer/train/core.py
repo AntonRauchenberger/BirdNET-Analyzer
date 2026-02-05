@@ -1,4 +1,9 @@
-from typing import Literal
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from birdnet_analyzer.config import SAMPLE_CROP_MODES, TRAINED_MODEL_OUTPUT_FORMATS, TRAINED_MODEL_SAVE_MODES, UPSAMPLING_MODES
 
 
 def train(
@@ -6,7 +11,7 @@ def train(
     output: str = "checkpoints/custom/Custom_Classifier",
     test_data: str | None = None,
     *,
-    crop_mode: Literal["center", "first", "segments"] = "center",
+    crop_mode: SAMPLE_CROP_MODES = "center",
     overlap: float = 0.0,
     epochs: int = 50,
     batch_size: int = 32,
@@ -20,11 +25,10 @@ def train(
     label_smoothing: bool = False,
     mixup: bool = False,
     upsampling_ratio: float = 0.0,
-    upsampling_mode: Literal["repeat", "mean", "smote"] = "repeat",
-    model_format: Literal["tflite", "raven", "both"] = "tflite",
-    model_save_mode: Literal["replace", "append"] = "replace",
-    cache_mode: Literal["load", "save"] | None = None,
-    cache_file: str = "train_cache.npz",
+    upsampling_mode: UPSAMPLING_MODES = "repeat",
+    model_format: TRAINED_MODEL_OUTPUT_FORMATS = "tflite",
+    model_save_mode: TRAINED_MODEL_SAVE_MODES = "replace",
+    save_cache_to: str | None = None,
     threads: int = 1,
     fmin: float = 0.0,
     fmax: float = 15000.0,
@@ -36,7 +40,7 @@ def train(
     """
     Trains a custom classifier model using the BirdNET-Analyzer framework.
     Args:
-        audio_input (str): Path to the training data directory.
+        audio_input (str): Path to the training data directory or path to a cache file ("train_cache.npz" for example).
         test_data (str, optional): Path to the test data directory. Defaults to None. If not specified, a validation split will be used.
         output (str, optional): Path to save the trained model. Defaults to "checkpoints/custom/Custom_Classifier".
         crop_mode (Literal["center", "first", "segments", "smart"], optional): Mode for cropping audio samples. Defaults to "center".
@@ -56,8 +60,7 @@ def train(
         upsampling_mode (Literal["repeat", "mean", "smote"], optional): Mode for upsampling. Defaults to "repeat".
         model_format (Literal["tflite", "raven", "both"], optional): Format to save the trained model. Defaults to "tflite".
         model_save_mode (Literal["replace", "append"], optional): Save mode for the model. Defaults to "replace".
-        cache_mode (Literal["load", "save"] | None, optional): Cache mode for training data. Defaults to None.
-        cache_file (str, optional): Path to the cache file. Defaults to "train_cache.npz".
+        save_cache_to (str | None, optional): Path to save the cache file. Defaults to None.
         threads (int, optional): Number of CPU threads to use. Defaults to 1.
         fmin (float, optional): Minimum frequency for bandpass filtering. Defaults to 0.0.
         fmax (float, optional): Maximum frequency for bandpass filtering. Defaults to 15000.0.
@@ -68,43 +71,35 @@ def train(
     Returns:
         None
     """
-    import birdnet_analyzer.config as cfg
     from birdnet_analyzer.train.utils import train_model
 
-    # Config
-    cfg.TRAIN_DATA_PATH = audio_input
-    cfg.TEST_DATA_PATH = test_data
-    cfg.SAMPLE_CROP_MODE = crop_mode
-    cfg.SIG_OVERLAP = overlap
-    cfg.CUSTOM_CLASSIFIER = output
-    cfg.TRAIN_EPOCHS = epochs
-    cfg.TRAIN_BATCH_SIZE = batch_size
-    cfg.TRAIN_VAL_SPLIT = val_split
-    cfg.TRAIN_LEARNING_RATE = learning_rate
-    cfg.TRAIN_WITH_FOCAL_LOSS = use_focal_loss if use_focal_loss is not None else cfg.TRAIN_WITH_FOCAL_LOSS
-    cfg.FOCAL_LOSS_GAMMA = focal_loss_gamma
-    cfg.FOCAL_LOSS_ALPHA = focal_loss_alpha
-    cfg.TRAIN_HIDDEN_UNITS = hidden_units
-    cfg.TRAIN_DROPOUT = dropout
-    cfg.TRAIN_WITH_LABEL_SMOOTHING = label_smoothing if label_smoothing is not None else cfg.TRAIN_WITH_LABEL_SMOOTHING
-    cfg.TRAIN_WITH_MIXUP = mixup if mixup is not None else cfg.TRAIN_WITH_MIXUP
-    cfg.UPSAMPLING_RATIO = upsampling_ratio
-    cfg.UPSAMPLING_MODE = upsampling_mode
-    cfg.TRAINED_MODEL_OUTPUT_FORMAT = model_format
-    cfg.TRAINED_MODEL_SAVE_MODE = model_save_mode
-    cfg.TRAIN_CACHE_MODE = cache_mode
-    cfg.TRAIN_CACHE_FILE = cache_file
-    cfg.TFLITE_THREADS = 1
-    cfg.CPU_THREADS = threads
-
-    cfg.BANDPASS_FMIN = fmin
-    cfg.BANDPASS_FMAX = fmax
-
-    cfg.AUDIO_SPEED = audio_speed
-
-    cfg.AUTOTUNE = autotune
-    cfg.AUTOTUNE_TRIALS = autotune_trials
-    cfg.AUTOTUNE_EXECUTIONS_PER_TRIAL = autotune_executions_per_trial
-
-    # Train model
-    train_model()
+    train_model(
+        audio_input,
+        output=output,
+        test_data=test_data,
+        crop_mode=crop_mode,
+        overlap=overlap,
+        epochs=epochs,
+        batch_size=batch_size,
+        val_split=val_split,
+        learning_rate=learning_rate,
+        use_focal_loss=use_focal_loss,
+        focal_loss_gamma=focal_loss_gamma,
+        focal_loss_alpha=focal_loss_alpha,
+        hidden_units=hidden_units,
+        dropout=dropout,
+        label_smoothing=label_smoothing,
+        mixup=mixup,
+        upsampling_ratio=upsampling_ratio,
+        upsampling_mode=upsampling_mode,
+        model_format=model_format,
+        model_save_mode=model_save_mode,
+        save_cache_to=save_cache_to,
+        threads=threads,
+        fmin=fmin,
+        fmax=fmax,
+        audio_speed=audio_speed,
+        autotune=autotune,
+        autotune_trials=autotune_trials,
+        autotune_executions_per_trial=autotune_executions_per_trial,
+    )

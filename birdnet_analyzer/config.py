@@ -118,14 +118,14 @@ LABEL_LANGUAGE: MODEL_LANGUAGES = MODEL_LANGUAGE_EN_US
 #####################
 
 # Sample crop mode
-SAMPLE_CROP_MODE: str = "center"
+SAMPLE_CROP_MODES = Literal["center", "first", "segments", "smart"]
 
 # List of non-event classes
 NON_EVENT_CLASSES: list[str] = ["noise", "other", "background", "silence"]
 
 # Upsampling settings
 UPSAMPLING_RATIO: float = 0.0
-UPSAMPLING_MODE = "repeat"
+UPSAMPLING_MODES = Literal["repeat", "mean", "smote"]
 
 # Number of epochs to train for
 TRAIN_EPOCHS: int = 50
@@ -162,10 +162,10 @@ FOCAL_LOSS_GAMMA: float = 2.0
 FOCAL_LOSS_ALPHA: float = 0.25
 
 # Model output format
-TRAINED_MODEL_OUTPUT_FORMAT: str = "tflite"
+TRAINED_MODEL_OUTPUT_FORMATS = Literal["tflite", "raven", "both"]
 
 # Model save mode (replace or append new classifier)
-TRAINED_MODEL_SAVE_MODE: str = "replace"
+TRAINED_MODEL_SAVE_MODES = Literal["replace", "append"]
 
 # Cache settings
 TRAIN_CACHE_MODE: str | None = None

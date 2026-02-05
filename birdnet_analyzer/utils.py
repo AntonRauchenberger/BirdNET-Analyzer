@@ -233,38 +233,11 @@ def load_from_cache(path):
     """
     import numpy as np
 
-    # Load cache file
-    data = np.load(path, allow_pickle=True)
-
-    # Check if cache contains needed preprocessing parameters
-    if (
-        "fmin" in data
-        and "fmax" in data
-        and "audio_speed" in data
-        and "crop_mode" in data
-        and "overlap" in data
-        and (  # Check if preprocessing parameters match current settings
-            data["fmin"] != cfg.BANDPASS_FMIN
-            or data["fmax"] != cfg.BANDPASS_FMAX
-            or data["audio_speed"] != cfg.AUDIO_SPEED
-            or data["crop_mode"] != cfg.SAMPLE_CROP_MODE
-            or data["overlap"] != cfg.SIG_OVERLAP
-        )
-    ):
-        print("\t...WARNING: Cache preprocessing parameters don't match current settings!", flush=True)
-        print(f"\t   Cache: fmin={data['fmin']}, fmax={data['fmax']}, speed={data['audio_speed']}", flush=True)
-        print(f"\t   Cache: crop_mode={data['crop_mode']}, overlap={data['overlap']}", flush=True)
-        print(f"\t   Current: fmin={cfg.BANDPASS_FMIN}, fmax={cfg.BANDPASS_FMAX}, speed={cfg.AUDIO_SPEED}", flush=True)
-        print(f"\t   Current: crop_mode={cfg.SAMPLE_CROP_MODE}, overlap={cfg.SIG_OVERLAP}", flush=True)
-
-    # Extract and return data
+    data: dict = np.load(path, allow_pickle=True)
     x_train = data["x_train"]
     y_train = data["y_train"]
-
-    # Handle test data which might not be in older cache files
     x_test = data.get("x_test", np.array([]))
     y_test = data.get("y_test", np.array([]))
-
     labels = data["labels"]
     binary_classification = bool(data.get("binary_classification", False))
     multi_label = bool(data.get("multi_label", False))

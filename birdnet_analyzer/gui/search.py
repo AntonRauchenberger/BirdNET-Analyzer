@@ -2,7 +2,6 @@ import os
 
 import gradio as gr
 
-import birdnet_analyzer.config as cfg
 import birdnet_analyzer.gui.localization as loc
 import birdnet_analyzer.gui.utils as gu
 from birdnet_analyzer.embeddings.core import _get_or_create_database as get_embeddings_database
@@ -37,9 +36,9 @@ def run_export(export_state: dict):
                 filebasename = os.path.basename(file[0])
                 filebasename = os.path.splitext(filebasename)[0]
                 dest = os.path.join(export_folder, f"{file[4]:.5f}_{filebasename}_{file[1]}_{file[1] + file[2]}.wav")
-                # @mamau: Missing audio speed?
-                sig, rate = audio.open_audio_file(file[0], offset=file[1], duration=file[2], sample_rate=None)
-                audio.save_signal(sig, dest, rate)
+                # TODO @mamau: Missing audio speed?
+                sig, rate = audio.open_audio_file(file[0], offset=file[1], duration=file[2], sample_rate=None)  # type: ignore
+                audio.save_signal(sig, dest, rate)  # type: ignore
 
         gr.Info(f"{loc.localize('embeddings-search-export-finish-info')} {export_folder}")
     else:
@@ -64,11 +63,6 @@ def run_search(db_path, query_path, max_samples, score_fn, crop_mode, crop_overl
     gu.validate(query_path, loc.localize("embeddings-search-query-validation-message"))
     gu.validate(max_samples, loc.localize("embeddings-search-max-samples-validation-message"))
 
-    cfg.MODEL_PATH = cfg.BIRDNET_MODEL_PATH
-    cfg.LABELS_FILE = cfg.BIRDNET_LABELS_FILE
-    cfg.SAMPLE_RATE = cfg.BIRDNET_SAMPLE_RATE
-    cfg.SIG_LENGTH = cfg.BIRDNET_SIG_LENGTH
-
     db = get_search_database(db_path)
     settings = db.get_metadata(SETTINGS_KEY)
 
@@ -76,9 +70,9 @@ def run_search(db_path, query_path, max_samples, score_fn, crop_mode, crop_overl
         query_path,
         db,
         max_samples,
-        settings["AUDIO_SPEED"],
-        settings["BANDPASS_FMIN"],
-        settings["BANDPASS_FMAX"],
+        settings["AUDIO_SPEED"],  # type: ignore
+        settings["BANDPASS_FMIN"],  # type: ignore
+        settings["BANDPASS_FMAX"],  # type: ignore
         score_fn,
         crop_mode,
         crop_overlap,
@@ -187,12 +181,12 @@ def build_search_tab():
                                         embedding_source = db.get_embedding_source(r.embedding_id)
                                         file = embedding_source.source_id
                                         offset = embedding_source.offsets[0]
-                                        duration = cfg.BIRDNET_SIG_LENGTH * settings["AUDIO_SPEED"]
+                                        duration = 3.0 * settings["AUDIO_SPEED"]  # type: ignore
                                         spec = utils.spectrogram_from_file(
                                             file,
                                             offset=offset,
                                             duration=duration,
-                                            speed=settings["AUDIO_SPEED"],
+                                            speed=settings["AUDIO_SPEED"],  # type: ignore
                                             fmin=settings["BANDPASS_FMIN"],
                                             fmax=settings["BANDPASS_FMAX"],
                                             fig_size=(6, 3),
@@ -249,7 +243,7 @@ def build_search_tab():
         embedding_count = db.count_embeddings()
         settings = db.get_metadata(SETTINGS_KEY)
         frequencies = f"{settings['BANDPASS_FMIN']} - {settings['BANDPASS_FMAX']} Hz"
-        speed = settings["AUDIO_SPEED"]
+        speed: float = settings["AUDIO_SPEED"]
         db.db.close()
 
         if folder:
@@ -283,14 +277,14 @@ def build_search_tab():
         if audiofilepath and db_selection:
             db = get_embeddings_database(db_selection)
             settings = db.get_metadata(SETTINGS_KEY)
-            audio_speed = settings["AUDIO_SPEED"]
+            audio_speed: float = settings["AUDIO_SPEED"]
             fmin = settings["BANDPASS_FMIN"]
             fmax = settings["BANDPASS_FMAX"]
             db.db.close()
 
             sig, rate = audio.open_audio_file(
                 audiofilepath,
-                duration=cfg.BIRDNET_SIG_LENGTH * audio_speed if crop_mode == "first" else None,
+                duration=3.0 * audio_speed if crop_mode == "first" else None,
                 fmin=fmin,
                 fmax=fmax,
                 speed=audio_speed,
@@ -298,9 +292,9 @@ def build_search_tab():
 
             # Crop query audio
             if crop_mode == "center":
-                sig = [audio.crop_center(sig, rate, cfg.BIRDNET_SIG_LENGTH)][0]
+                sig = [audio.crop_center(sig, rate, 3.0)][0]
             elif crop_mode == "first":
-                sig = [audio.split_signal(sig, rate, cfg.BIRDNET_SIG_LENGTH, crop_overlap, cfg.SIG_MINLEN)[0]][0]
+                sig = [audio.split_signal(sig, rate, 3.0, crop_overlap, 1.0)[0]][0]
 
             sig = np.array(sig, dtype="float32")
             spec = utils.spectrogram_from_audio(sig, rate, fig_size=(10, 4))

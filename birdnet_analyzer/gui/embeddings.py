@@ -73,9 +73,9 @@ def run_embeddings(
             n_producers=producers_number,
             n_workers=workers_number,
             batch_size=batch_size,
-            audio_speed=settings["AUDIO_SPEED"],
-            fmin=settings["BANDPASS_FMIN"],
-            fmax=settings["BANDPASS_FMAX"],
+            audio_speed=settings["AUDIO_SPEED"],  # type: ignore
+            fmin=settings["BANDPASS_FMIN"],  # type: ignore
+            fmax=settings["BANDPASS_FMAX"],  # type: ignore
             file_output=file_output,
         )
     except Exception as e:
@@ -83,8 +83,8 @@ def run_embeddings(
 
         audio_speed = gu.slider_to_value(audio_speed)
 
-        if fmin is None or fmax is None or fmin < cfg.SIG_FMIN or fmax > cfg.SIG_FMAX or fmin > fmax:
-            raise gr.Error(f"{loc.localize('validation-no-valid-frequency')} [{cfg.SIG_FMIN}, {cfg.SIG_FMAX}]") from e
+        if fmin is None or fmax is None or fmin < 0 or fmax > 15000 or fmin > fmax:
+            raise gr.Error(f"{loc.localize('validation-no-valid-frequency')} [0, 15000]") from e
 
         embeddings(input_path, db_directory, overlap=overlap, audio_speed=audio_speed, fmin=fmin, fmax=fmax, batch_size=batch_size, file_output=file_output)
 
@@ -188,9 +188,9 @@ def build_embeddings_tab():
                             return (
                                 dir_name,
                                 gr.Textbox(value=dir_name),
-                                gr.Slider(value=settings["AUDIO_SPEED"], interactive=False),
-                                gr.Number(value=settings["BANDPASS_FMIN"], interactive=False),
-                                gr.Number(value=settings["BANDPASS_FMAX"], interactive=False),
+                                gr.Slider(value=settings["AUDIO_SPEED"], interactive=False),  # type: ignore
+                                gr.Number(value=settings["BANDPASS_FMIN"], interactive=False),  # type: ignore
+                                gr.Number(value=settings["BANDPASS_FMAX"], interactive=False),  # type: ignore
                                 gr.update(visible=True),
                             )
                         except KeyError:

@@ -2,7 +2,6 @@ import os
 
 import gradio as gr
 
-import birdnet_analyzer.config as cfg
 import birdnet_analyzer.gui.localization as loc
 import birdnet_analyzer.gui.utils as gu
 from birdnet_analyzer.gui import settings
@@ -55,9 +54,7 @@ def build_species_tab():
             show_progress="hidden",
         )
 
-        lat_number, lon_number, week_number, sf_thresh_number, yearlong_checkbox, map_plot = (
-            gu.species_list_coordinates(show_map=True)
-        )
+        lat_number, lon_number, week_number, sf_thresh_number, yearlong_checkbox, map_plot = gu.species_list_coordinates(show_map=True)
 
         sortby = gr.Radio(
             [
@@ -84,9 +81,7 @@ def build_species_tab():
             ],
         )
 
-    species_tab.select(
-        lambda lat, lon: gu.plot_map_scatter_mapbox(lat, lon, zoom=3), inputs=[lat_number, lon_number], outputs=map_plot
-    )
+    species_tab.select(lambda lat, lon: gu.plot_map_scatter_mapbox(lat, lon, zoom=3), inputs=[lat_number, lon_number], outputs=map_plot)
 
     return lat_number, lon_number, map_plot
 

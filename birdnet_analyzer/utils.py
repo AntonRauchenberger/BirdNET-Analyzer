@@ -6,7 +6,7 @@ import sys
 import traceback
 from pathlib import Path
 
-import birdnet_analyzer.config as cfg
+from birdnet_analyzer.config import ALLOWED_FILETYPES, CODES_FILE, ERROR_LOG_FILE
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 FROZEN = getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
@@ -96,7 +96,7 @@ def spectrogram_from_audio(s, sr, fig_num=None, fig_size=None):
     ax.set_axis_off()
     f.tight_layout(pad=0)
 
-    D = librosa.stft(s, n_fft=1024, hop_length=512)  # STFT of y
+    D = librosa.stft(s, n_fft=1024, hop_length=512)
     S_db = librosa.amplitude_to_db(np.abs(D), ref=np.max)
 
     return librosa.display.specshow(S_db, ax=ax, n_fft=1024, hop_length=512).figure
@@ -111,35 +111,15 @@ def collect_audio_files(path: str, max_files: int | None = None):
     Returns:
         A sorted list of all audio files in the directory.
     """
-    # Get all files in directory with os.walk
     files = []
 
     for root, _, flist in os.walk(path):
         for f in flist:
-            if not f.startswith(".") and f.rsplit(".", 1)[-1].lower() in cfg.ALLOWED_FILETYPES:
+            if not f.startswith(".") and f.rsplit(".", 1)[-1].lower() in ALLOWED_FILETYPES:
                 files.append(os.path.join(root, f))
 
                 if max_files and len(files) >= max_files:
                     return sorted(files)
-
-    return sorted(files)
-
-
-def collect_all_files(path: str, filetypes: list[str], pattern: str = ""):
-    """Collects all files of the given filetypes in the given directory.
-
-    Args:
-        path: The directory to be searched.
-        filetypes: A list of filetypes to be collected.
-
-    Returns:
-        A sorted list of all files in the directory.
-    """
-
-    files = []
-
-    for root, _, flist in os.walk(path):
-        files.extend(os.path.join(root, f) for f in flist if not f.startswith(".") and f.rsplit(".", 1)[-1].lower() in filetypes and (pattern in f or not pattern))
 
     return sorted(files)
 
@@ -186,72 +166,13 @@ def list_subdirectories(path: str):
     return filter(lambda el: os.path.isdir(os.path.join(path, el)), os.listdir(path))
 
 
-def save_to_cache(path, x_train, y_train, x_test, y_test, labels):
-    """Saves training data to cache.
-
-    Args:
-        path: Path to the cache file.
-        x_train: Training samples.
-        y_train: Training labels.
-        x_test: Test samples.
-        y_test: Test labels.
-        labels: Labels.
-    """
-    import numpy as np
-
-    # Make directory if needed
-    directory = os.path.dirname(path)
-    if directory and not os.path.exists(directory):
-        os.makedirs(directory)
-
-    # Save cache file with training data, test data, labels and configuration
-    np.savez(
-        path,
-        x_train=x_train,
-        y_train=y_train,
-        x_test=x_test,
-        y_test=y_test,
-        labels=np.array(labels, dtype=object),
-        binary_classification=cfg.BINARY_CLASSIFICATION,
-        multi_label=cfg.MULTI_LABEL,
-        fmin=cfg.BANDPASS_FMIN,
-        fmax=cfg.BANDPASS_FMAX,
-        audio_speed=cfg.AUDIO_SPEED,
-        crop_mode=cfg.SAMPLE_CROP_MODE,
-        overlap=cfg.SIG_OVERLAP,
-    )
-
-
-def load_from_cache(path):
-    """Loads training data from cache.
-
-    Args:
-        path: Path to the cache file.
-
-    Returns:
-        A tuple of (x_train, y_train, labels, binary_classification, multi_label).
-    """
-    import numpy as np
-
-    data: dict = np.load(path, allow_pickle=True)
-    x_train = data["x_train"]
-    y_train = data["y_train"]
-    x_test = data.get("x_test", np.array([]))
-    y_test = data.get("y_test", np.array([]))
-    labels = data["labels"]
-    binary_classification = bool(data.get("binary_classification", False))
-    multi_label = bool(data.get("multi_label", False))
-
-    return x_train, y_train, x_test, y_test, labels, binary_classification, multi_label
-
-
 def clear_error_log():
     """Clears the error log file.
 
     For debugging purposes.
     """
-    if os.path.isfile(cfg.ERROR_LOG_FILE):
-        os.remove(cfg.ERROR_LOG_FILE)
+    if os.path.isfile(ERROR_LOG_FILE):
+        os.remove(ERROR_LOG_FILE)
 
 
 def write_error_log(ex: Exception):
@@ -264,7 +185,7 @@ def write_error_log(ex: Exception):
     """
     import datetime
 
-    with open(cfg.ERROR_LOG_FILE, "a") as elog:
+    with open(ERROR_LOG_FILE, "a") as elog:
         elog.write(datetime.datetime.now().strftime("[%Y-%m-%d %H:%M:%S]") + "\n" + "".join(traceback.TracebackException.from_exception(ex).format()) + "\n")
 
 
@@ -276,7 +197,7 @@ def load_codes() -> dict[str, str]:
     """
     import json
 
-    with open(os.path.join(SCRIPT_DIR, cfg.CODES_FILE), encoding="utf-8") as cfile:
+    with open(os.path.join(SCRIPT_DIR, CODES_FILE), encoding="utf-8") as cfile:
         return json.load(cfile)
 
 
@@ -303,19 +224,3 @@ def save_params_to_file(file_path, headers, values):
         paramswriter = csv.writer(paramsfile)
         paramswriter.writerow(headers)
         paramswriter.writerow(values)
-
-
-def save_result_file(result_path: str, out_string: str):
-    """Saves the result to a file.
-
-    Args:
-        result_path: The path to the result file.
-        out_string: The string to be written to the file.
-    """
-
-    # Make directory if it doesn't exist
-    os.makedirs(os.path.dirname(result_path), exist_ok=True)
-
-    # Write the result to the file
-    with open(result_path, "w", encoding="utf-8") as rfile:
-        rfile.write(out_string)

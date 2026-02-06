@@ -143,7 +143,7 @@ def _load_training_data(
 
     if audio_input.endswith(".npz"):
         if os.path.isfile(audio_input):
-            x_train, y_train, x_test, y_test, labels, is_binary, is_multi_label = utils.load_from_cache(audio_input)
+            x_train, y_train, x_test, y_test, labels, is_binary, is_multi_label = _load_from_cache(audio_input)
 
             return x_train, y_train, x_test, y_test, labels, is_binary, is_multi_label
 
@@ -265,7 +265,21 @@ def _load_training_data(
 
     if save_cache_to:
         try:
-            utils.save_to_cache(save_cache_to, x_train, y_train, x_test, y_test, valid_labels)
+            _save_to_cache(
+                save_cache_to,
+                x_train,
+                y_train,
+                x_test,
+                y_test,
+                valid_labels,
+                overlap=overlap,
+                fmin=fmin,
+                fmax=fmax,
+                audio_speed=audio_speed,
+                crop_mode=crop_mode,
+                is_binary=is_binary,
+                is_multi_label=is_multi_label,
+            )
         except Exception as e:
             print(f"\t...error saving cache: {e}", flush=True)
 
@@ -870,3 +884,71 @@ def evaluate_model(classifier, x_test, y_test, labels, threshold=None):
     metrics["class_distribution"] = class_distribution
 
     return metrics
+
+
+def _save_to_cache(
+    path, x_train, y_train, x_test, y_test, labels, overlap=0.0, fmin=0.0, fmax=15000.0, audio_speed=1.0, crop_mode="center", is_binary=False, is_multi_label=False
+):
+    """Saves training data to cache.
+
+    Args:
+        path: Path to the cache file.
+        x_train: Training samples.
+        y_train: Training labels.
+        x_test: Test samples.
+        y_test: Test labels.
+        labels: Labels.
+        overlap: Overlap between samples.
+        fmin: Minimum frequency for bandpass filter.
+        fmax: Maximum frequency for bandpass filter.
+        audio_speed: Speed of audio playback.
+        crop_mode: Mode for cropping samples.
+        is_binary: Whether it's a binary classification task.
+        is_multi_label: Whether it's a multi-label classification task.
+    """
+    import numpy as np
+
+    # Make directory if needed
+    directory = os.path.dirname(path)
+    if directory and not os.path.exists(directory):
+        os.makedirs(directory)
+
+    # Save cache file with training data, test data, labels and configuration
+    np.savez(
+        path,
+        x_train=x_train,
+        y_train=y_train,
+        x_test=x_test,
+        y_test=y_test,
+        labels=np.array(labels, dtype=object),
+        binary_classification=is_binary,
+        multi_label=is_multi_label,
+        fmin=fmin,
+        fmax=fmax,
+        audio_speed=audio_speed,
+        crop_mode=crop_mode,
+        overlap=overlap,
+    )
+
+
+def _load_from_cache(path):
+    """Loads training data from cache.
+
+    Args:
+        path: Path to the cache file.
+
+    Returns:
+        A tuple of (x_train, y_train, labels, binary_classification, multi_label).
+    """
+    import numpy as np
+
+    data: dict = np.load(path, allow_pickle=True)
+    x_train = data["x_train"]
+    y_train = data["y_train"]
+    x_test = data.get("x_test", np.array([]))
+    y_test = data.get("y_test", np.array([]))
+    labels = data["labels"]
+    binary_classification = bool(data.get("binary_classification", False))
+    multi_label = bool(data.get("multi_label", False))
+
+    return x_train, y_train, x_test, y_test, labels, binary_classification, multi_label

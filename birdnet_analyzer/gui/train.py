@@ -5,7 +5,6 @@ from pathlib import Path
 
 import gradio as gr
 
-import birdnet_analyzer.config as cfg
 import birdnet_analyzer.gui.localization as loc
 import birdnet_analyzer.gui.utils as gu
 from birdnet_analyzer import utils
@@ -112,7 +111,8 @@ def start_training(
 
     from birdnet_analyzer.train.utils import train_model
 
-    # Skip training data validation when cache mode is "load"
+    cc_output_path = str(Path(output_dir) / classifier_name)
+
     if cache_mode != "load":
         gu.validate(data_dir, loc.localize("validation-no-training-data-selected"))
 
@@ -128,53 +128,17 @@ def start_training(
     if not learning_rate or learning_rate < 0:
         raise gr.Error(loc.localize("validation-no-valid-learning-rate"))
 
-    if fmin < cfg.SIG_FMIN or fmax > cfg.SIG_FMAX or fmin > fmax:
-        raise gr.Error(f"{loc.localize('validation-no-valid-frequency')} [{cfg.SIG_FMIN}, {cfg.SIG_FMAX}]")
-
-    cfg.TRAIN_WITH_FOCAL_LOSS = focal_loss
-    cfg.FOCAL_LOSS_GAMMA = max(0.0, float(focal_loss_gamma))
-    cfg.FOCAL_LOSS_ALPHA = max(0.0, min(1.0, float(focal_loss_alpha)))
+    if fmin < 0 or fmax > 15000 or fmin > fmax:
+        raise gr.Error(f"{loc.localize('validation-no-valid-frequency')} [0, 15000]")
 
     if not hidden_units or hidden_units < 0:
         hidden_units = 0
 
-    cfg.TRAIN_DROPOUT = max(0.0, min(1.0, float(dropout)))
-
     if progress is not None:
         progress((0, epochs), desc=loc.localize("progress-build-classifier"), unit="epochs")
 
-    cfg.TRAIN_DATA_PATH = data_dir
-    cfg.TEST_DATA_PATH = test_data_dir
-    cfg.SAMPLE_CROP_MODE = crop_mode
-    cfg.SIG_OVERLAP = max(0.0, min(2.9, float(crop_overlap)))
-    cfg.CUSTOM_CLASSIFIER = str(Path(output_dir) / classifier_name)
-    cfg.TRAIN_EPOCHS = int(epochs)
-    cfg.TRAIN_BATCH_SIZE = int(batch_size)
-    cfg.TRAIN_LEARNING_RATE = learning_rate
-    cfg.TRAIN_HIDDEN_UNITS = int(hidden_units)
-    cfg.TRAIN_WITH_LABEL_SMOOTHING = label_smoothing
-    cfg.TRAIN_WITH_MIXUP = use_mixup
-    cfg.UPSAMPLING_RATIO = min(max(0, upsampling_ratio), 1)
-    cfg.UPSAMPLING_MODE = upsampling_mode
-    cfg.TRAINED_MODEL_OUTPUT_FORMAT = model_format
-
-    cfg.BANDPASS_FMIN = max(0, min(cfg.SIG_FMAX, int(fmin)))
-    cfg.BANDPASS_FMAX = max(cfg.SIG_FMIN, min(cfg.SIG_FMAX, int(fmax)))
-
-    cfg.TRAINED_MODEL_SAVE_MODE = model_save_mode
-    cfg.TRAIN_CACHE_MODE = cache_mode
-    cfg.TRAIN_CACHE_FILE = os.path.join(cache_file, cache_file_name) if cache_mode == "save" else cache_file
-    cfg.TFLITE_THREADS = 1
-    cfg.CPU_THREADS = max(1, multiprocessing.cpu_count() - 1)  # let's use everything we have (well, almost)
-
-    if cache_mode == "load" and not os.path.isfile(cfg.TRAIN_CACHE_FILE):
+    if cache_mode == "load" and not os.path.isfile(cache_file):
         raise gr.Error(loc.localize("validation-no-cache-file-selected"))
-
-    cfg.AUTOTUNE = autotune
-    cfg.AUTOTUNE_TRIALS = autotune_trials
-    cfg.AUTOTUNE_EXECUTIONS_PER_TRIAL = int(autotune_executions_per_trials)
-
-    cfg.AUDIO_SPEED = max(0.1, 1.0 / (audio_speed * -1)) if audio_speed < 0 else max(1.0, float(audio_speed))
 
     def data_load_progression(num_files, num_total_files, label):
         if progress is not None:
@@ -192,7 +156,7 @@ def start_training(
                     (epoch + 1, epochs),
                     total=epochs,
                     unit="epochs",
-                    desc=f"{loc.localize('progress-saving')} {cfg.CUSTOM_CLASSIFIER}",
+                    desc=f"{loc.localize('progress-saving')} {cc_output_path}",
                 )
             else:
                 progress((epoch + 1, epochs), total=epochs, unit="epochs", desc=loc.localize("progress-training"))
@@ -202,15 +166,39 @@ def start_training(
             progress((trial, autotune_trials), total=autotune_trials, unit="trials", desc=loc.localize("progress-autotune"))
 
     try:
-        history_result = train_model(
+        history, metrics = train_model(
+            audio_input=cache_file if cache_mode == "load" else data_dir,
+            output=cc_output_path,
+            test_data=test_data_dir,
+            crop_mode=crop_mode,
+            epochs=int(epochs),
+            batch_size=int(batch_size),
+            learning_rate=learning_rate,
+            hidden_units=hidden_units,
+            label_smoothing=label_smoothing,
+            mixup=use_mixup,
+            upsampling_ratio=min(max(0, upsampling_ratio), 1),
+            upsampling_mode=upsampling_mode,
+            model_format=model_format,
+            use_focal_loss=focal_loss,
+            focal_loss_gamma=max(0.0, float(focal_loss_gamma)),
+            focal_loss_alpha=max(0.0, min(1.0, float(focal_loss_alpha))),
+            fmin=max(0, min(15000, int(fmin))),
+            fmax=max(0, min(15000, int(fmax))),
+            model_save_mode=model_save_mode,
+            save_cache_to=os.path.join(cache_file, cache_file_name) if cache_mode == "save" else None,
+            dropout=max(0.0, min(1.0, float(dropout))),
+            overlap=max(0.0, min(2.9, float(crop_overlap))),
+            threads=max(1, multiprocessing.cpu_count()),
             on_epoch_end=epoch_progression,
             on_trial_result=trial_progression,
             on_data_load_end=data_load_progression,
+            audio_speed=max(0.1, 1.0 / (audio_speed * -1)) if audio_speed < 0 else max(1.0, float(audio_speed)),
+            autotune=autotune,
+            autotune_trials=autotune_trials,
+            autotune_executions_per_trial=int(autotune_executions_per_trials),
             autotune_directory=APPDIR if utils.FROZEN else "autotune",
         )
-
-        # Unpack history and metrics
-        history, metrics = history_result
     except Exception as e:
         if e.args and len(e.args) > 1:
             raise gr.Error(loc.localize(e.args[1])) from e
@@ -277,7 +265,7 @@ def build_train_tab():
                     )
                     output_format = gr.Radio(
                         ["tflite", "raven", (loc.localize("training-tab-output-format-both"), "both")],
-                        value=cfg.TRAINED_MODEL_OUTPUT_FORMAT,
+                        value="tflite",
                         label=loc.localize("training-tab-output-format-radio-label"),
                         info=loc.localize("training-tab-output-format-radio-info"),
                         visible=False,
@@ -305,7 +293,7 @@ def build_train_tab():
             cache_file_state = gr.State()
             cache_mode = gr.Radio(
                 [
-                    (loc.localize("training-tab-cache-mode-radio-option-none"), None),
+                    (loc.localize("training-tab-cache-mode-radio-option-none"), None),  # type: ignore
                     (loc.localize("training-tab-cache-mode-radio-option-load"), "load"),
                     (loc.localize("training-tab-cache-mode-radio-option-save"), "save"),
                 ],
@@ -375,14 +363,14 @@ def build_train_tab():
 
         with gr.Row():
             fmin_number = gr.Number(
-                cfg.SIG_FMIN,
+                0,
                 minimum=0,
                 label=loc.localize("inference-settings-fmin-number-label"),
                 info=loc.localize("inference-settings-fmin-number-info"),
             )
 
             fmax_number = gr.Number(
-                cfg.SIG_FMAX,
+                15000,
                 minimum=0,
                 label=loc.localize("inference-settings-fmax-number-label"),
                 info=loc.localize("inference-settings-fmax-number-info"),
@@ -392,7 +380,7 @@ def build_train_tab():
             audio_speed_slider = gr.Slider(
                 minimum=-10,
                 maximum=10,
-                value=cfg.AUDIO_SPEED,
+                value=1,
                 step=1,
                 label=loc.localize("training-tab-audio-speed-slider-label"),
                 info=loc.localize("training-tab-audio-speed-slider-info"),
@@ -414,7 +402,7 @@ def build_train_tab():
             crop_overlap = gr.Slider(
                 minimum=0,
                 maximum=2.99,
-                value=cfg.SIG_OVERLAP,
+                value=0.0,
                 step=0.01,
                 label=loc.localize("training-tab-crop-overlap-number-label"),
                 info=loc.localize("training-tab-crop-overlap-number-info"),
@@ -521,14 +509,14 @@ def build_train_tab():
                         (loc.localize("training-tab-upsampling-radio-option-linear"), "linear"),
                         ("SMOTE", "smote"),
                     ],
-                    value=cfg.UPSAMPLING_MODE,
+                    value="repeat",
                     label=loc.localize("training-tab-upsampling-radio-label"),
                     info=loc.localize("training-tab-upsampling-radio-info"),
                 )
                 upsampling_ratio = gr.Slider(
                     0.0,
                     1.0,
-                    cfg.UPSAMPLING_RATIO,
+                    0.0,
                     step=0.05,
                     label=loc.localize("training-tab-upsampling-ratio-slider-label"),
                     info=loc.localize("training-tab-upsampling-ratio-slider-info"),
@@ -592,7 +580,7 @@ def build_train_tab():
                 (loc.localize("training-tab-model-save-mode-radio-option-replace"), "replace"),
                 (loc.localize("training-tab-model-save-mode-radio-option-append"), "append"),
             ],
-            value=cfg.TRAINED_MODEL_SAVE_MODE,
+            value="replace",
             label=loc.localize("training-tab-model-save-mode-radio-label"),
             info=loc.localize("training-tab-model-save-mode-radio-info"),
         )
@@ -608,12 +596,9 @@ def build_train_tab():
         def train_and_show_metrics(*args):
             history, metrics = start_training(*args)
 
-            # If metrics are available (test data was provided), create table
             if metrics:
-                # Create dataframe data with metrics
                 table_data = []
 
-                # Add overall metrics row first
                 table_data.append(
                     [
                         "OVERALL (Macro-avg)",
@@ -643,7 +628,6 @@ def build_train_tab():
 
                 return history, gr.Dataframe(visible=True, value=table_data)
 
-            # No metrics available, just return history and hide table
             return history, gr.Dataframe(visible=False)
 
         start_training_button.click(

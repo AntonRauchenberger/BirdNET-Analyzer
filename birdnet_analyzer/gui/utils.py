@@ -8,7 +8,6 @@ import sys
 import warnings
 from collections.abc import Callable
 from contextlib import suppress
-from pathlib import Path
 from typing import Literal, cast, get_args
 
 import gradio as gr
@@ -24,13 +23,12 @@ warnings.filterwarnings("ignore")
 loc.load_local_state()
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
-ORIGINAL_TRANSLATED_LABELS_PATH = str(Path(SCRIPT_DIR).parent / cfg.TRANSLATED_LABELS_PATH)
 _CUSTOM_SPECIES = loc.localize("species-list-radio-option-custom-list")
 _PREDICT_SPECIES = loc.localize("species-list-radio-option-predict-list")
 _CUSTOM_CLASSIFIER = loc.localize("species-list-radio-option-custom-classifier")
 _ALL_SPECIES = loc.localize("species-list-radio-option-all")
 _USE_PERCH = loc.localize("species-list-radio-option-use-perch")
-_USE_BIRDNET = "BirdNET " + cfg.MODEL_VERSION
+_USE_BIRDNET_2_4 = "BirdNET 2.4"
 _WINDOW: webview.Window | None = None
 _URL = ""
 _HEART_LOGO = "data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjE2IiB2aWV3Qm94PSIwIDAgMTYgMTYiIHZlcnNpb249IjEuMSIgd2lkdGg9IjE2IiBkYXRhLXZpZXctY29tcG9uZW50PSJ0cnVlIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPg0KICAgIDxwYXRoIGQ9Im04IDE0LjI1LjM0NS42NjZhLjc1Ljc1IDAgMCAxLS42OSAwbC0uMDA4LS4wMDQtLjAxOC0uMDFhNy4xNTIgNy4xNTIgMCAwIDEtLjMxLS4xNyAyMi4wNTUgMjIuMDU1IDAgMCAxLTMuNDM0LTIuNDE0QzIuMDQ1IDEwLjczMSAwIDguMzUgMCA1LjUgMCAyLjgzNiAyLjA4NiAxIDQuMjUgMSA1Ljc5NyAxIDcuMTUzIDEuODAyIDggMy4wMiA4Ljg0NyAxLjgwMiAxMC4yMDMgMSAxMS43NSAxIDEzLjkxNCAxIDE2IDIuODM2IDE2IDUuNWMwIDIuODUtMi4wNDUgNS4yMzEtMy44ODUgNi44MThhMjIuMDY2IDIyLjA2NiAwIDAgMS0zLjc0NCAyLjU4NGwtLjAxOC4wMS0uMDA2LjAwM2gtLjAwMlpNNC4yNSAyLjVjLTEuMzM2IDAtMi43NSAxLjE2NC0yLjc1IDMgMCAyLjE1IDEuNTggNC4xNDQgMy4zNjUgNS42ODJBMjAuNTggMjAuNTggMCAwIDAgOCAxMy4zOTNhMjAuNTggMjAuNTggMCAwIDAgMy4xMzUtMi4yMTFDMTIuOTIgOS42NDQgMTQuNSA3LjY1IDE0LjUgNS41YzAtMS44MzYtMS40MTQtMy0yLjc1LTMtMS4zNzMgMC0yLjYwOS45ODYtMy4wMjkgMi40NTZhLjc0OS43NDkgMCAwIDEtMS40NDIgMEM2Ljg1OSAzLjQ4NiA1LjYyMyAyLjUgNC4yNSAyLjVaIj48L3BhdGg+DQo8L3N2Zz4="  # noqa: E501
@@ -132,7 +130,7 @@ def get_audio_files_and_durations(folder, max_files=None):
     import librosa
 
     files_and_durations = []
-    files = utils.collect_audio_files(folder, max_files=max_files)  # Use the collect_audio_files function
+    files = utils.collect_audio_files(folder, max_files=max_files)
 
     for file_path in files:
         try:
@@ -236,7 +234,7 @@ def build_footer():
         <div style="display: flex;flex-direction: row;">GUI version:&nbsp<span
                 id="current-version">{os.environ["GUI_VERSION"] if utils.FROZEN else "main"}</span><span
                 style="display: none" id="update-available"><a>+</a></span></div>
-        <div>Model version: {cfg.MODEL_VERSION}</div>
+        <div>Model version: 2.4</div>
     </div>
     <div>K. Lisa Yang Center for Conservation Bioacoustics<br>Chemnitz University of Technology</div>
     <div>{loc.localize("footer-help")}:&nbsp;<a href='https://birdnet.cornell.edu/analyzer'
@@ -299,7 +297,7 @@ def build_settings():
             prev_theme = settings.theme()
             if prev_theme != value:
                 settings.set_setting("theme", value)
-                _WINDOW.load_url(_URL.rstrip("/") + f"?__theme={value}")
+                _WINDOW.load_url(_URL.rstrip("/") + f"?__theme={value}")  # type: ignore
 
         def on_tab_select(value: gr.SelectData):
             if value.selected and os.path.exists(cfg.ERROR_LOG_FILE):
@@ -392,7 +390,7 @@ def sample_sliders(opened=True) -> dict[_SAMPLE_KEYS, gr.components.Component]:
                 overlap_slider = gr.Slider(
                     minimum=0,
                     maximum=2.9,
-                    value=cfg.SIG_OVERLAP,
+                    value=0.0,
                     step=0.1,
                     label=loc.localize("inference-settings-overlap-slider-label"),
                     info=loc.localize("inference-settings-overlap-slider-info"),
@@ -410,7 +408,7 @@ def sample_sliders(opened=True) -> dict[_SAMPLE_KEYS, gr.components.Component]:
                 audio_speed_slider = gr.Slider(
                     minimum=-10,
                     maximum=10,
-                    value=cfg.AUDIO_SPEED,
+                    value=0,
                     step=1,
                     label=loc.localize("inference-settings-audio-speed-slider-label"),
                     info=loc.localize("inference-settings-audio-speed-slider-info"),
@@ -434,14 +432,14 @@ def sample_sliders(opened=True) -> dict[_SAMPLE_KEYS, gr.components.Component]:
 def bandpass_settings():
     with gr.Row():
         fmin_number = gr.Number(
-            cfg.SIG_FMIN,
+            0,
             minimum=0,
             label=loc.localize("inference-settings-fmin-number-label"),
             info=loc.localize("inference-settings-fmin-number-info"),
         )
 
         fmax_number = gr.Number(
-            cfg.SIG_FMAX,
+            15000,
             minimum=0,
             label=loc.localize("inference-settings-fmax-number-label"),
             info=loc.localize("inference-settings-fmax-number-info"),
@@ -542,7 +540,7 @@ def save_file_dialog(filetypes=(), state_key=None, default_filename=""):
         The selected file or None of the dialog was canceled.
     """
     initial_selection = settings.get_state(state_key, "") if state_key else ""
-    file = _WINDOW.create_file_dialog(webview.FileDialog.SAVE, file_types=filetypes, directory=initial_selection, save_filename=default_filename)
+    file = _WINDOW.create_file_dialog(webview.FileDialog.SAVE, file_types=filetypes, directory=initial_selection, save_filename=default_filename)  # type: ignore
 
     if file:
         file: str = file[0] if isinstance(file, list | tuple) else file
@@ -565,7 +563,7 @@ def select_file(filetypes=(), state_key=None):
         The selected file or None of the dialog was canceled.
     """
     initial_selection = settings.get_state(state_key, "") if state_key else ""
-    files = _WINDOW.create_file_dialog(webview.FileDialog.OPEN, file_types=filetypes, directory=initial_selection)
+    files = _WINDOW.create_file_dialog(webview.FileDialog.OPEN, file_types=filetypes, directory=initial_selection)  # type: ignore
 
     if files:
         if state_key:
@@ -610,14 +608,14 @@ def show_species_choice(choice: str, file_input):
 def model_selection(opened=True):
     with gr.Group(), gr.Accordion(loc.localize("model-selection-accordion-label"), open=opened):
         with gr.Row():
-            values = [_USE_BIRDNET, _CUSTOM_CLASSIFIER, _USE_PERCH]
+            values = [_USE_BIRDNET_2_4, _CUSTOM_CLASSIFIER, _USE_PERCH]
 
             if platform.system() == "Darwin":
                 values.pop()  # TODO: Remove when tf 2.21+ is available on macOS
 
             model_selection_radio = gr.Radio(
                 choices=values,
-                value=_USE_BIRDNET,
+                value=_USE_BIRDNET_2_4,
                 label=loc.localize("model-selection-radio-label"),
                 info=loc.localize("model-selection-radio-info"),
             )
@@ -742,7 +740,7 @@ def download_plot(plot, filename=""):
     from PIL import Image
 
     imgdata = base64.b64decode(plot.plot.split(",", 1)[1])
-    res = _WINDOW.create_file_dialog(
+    res = _WINDOW.create_file_dialog(  # type: ignore
         webview.FileDialog.SAVE,
         file_types=("PNG (*.png)", "Webp (*.webp)", "JPG (*.jpg)"),
         save_filename=filename,
@@ -785,7 +783,7 @@ def _get_network_shortcuts():
     try:
         # https://learn.microsoft.com/de-de/windows/win32/shell/csidl
         # CSIDL_NETHOOD: Path to folder containing network shortcuts
-        network_shortcuts = shell.SHGetFolderPath(0, shellcon.CSIDL_NETHOOD, None, 0)
+        network_shortcuts = shell.SHGetFolderPath(0, shellcon.CSIDL_NETHOOD, None, 0)  # type: ignore
         shortcuts = []
 
         for item in os.listdir(network_shortcuts):
@@ -932,8 +930,8 @@ def open_window(builder: list[Callable] | Callable):
         from webview.platforms.winforms import BrowserView
 
         dwmapi = ctypes.windll.LoadLibrary("dwmapi")
-        _WINDOW.events.loaded += lambda: dwmapi.DwmSetWindowAttribute(
-            BrowserView.instances[_WINDOW.uid].Handle.ToInt32(),
+        _WINDOW.events.loaded += lambda: dwmapi.DwmSetWindowAttribute(  # type: ignore
+            BrowserView.instances[_WINDOW.uid].Handle.ToInt32(),  # type: ignore
             20,  # DWMWA_USE_IMMERSIVE_DARK_MODE
             ctypes.byref(ctypes.c_bool(settings.theme() == "dark")),
             ctypes.sizeof(wintypes.BOOL),

@@ -101,7 +101,7 @@ def build_review_tab():
             ax.scatter(thresholds, target_ps, color=p_colors, marker="x")
 
             box = ax.get_position()
-            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            ax.set_position((box.x0, box.y0, box.width * 0.8, box.height))
 
             if any(threshold <= 1 for threshold in thresholds):
                 ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))

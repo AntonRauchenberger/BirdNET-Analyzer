@@ -70,10 +70,6 @@ CODES_FILE: str = os.path.join(SCRIPT_DIR, "eBird_taxonomy_codes_2024E.json")
 # Supported file types
 ALLOWED_FILETYPES: list[str] = ["wav", "flac", "mp3", "ogg", "m4a", "wma", "aiff", "aif"]
 
-# Number of threads to use for inference.
-# Can be as high as number of CPUs in your system
-CPU_THREADS: int = 8
-
 # Whether to use noise to pad the signal
 # If set to False, the signal will be padded with zeros
 USE_NOISE: bool = False

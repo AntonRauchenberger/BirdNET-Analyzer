@@ -5,8 +5,6 @@ from typing import cast, get_args
 
 from birdnet.globals import ACOUSTIC_MODEL_VERSIONS, MODEL_LANGUAGE_EN_US, MODEL_LANGUAGES
 
-import birdnet_analyzer.config as cfg
-
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 ASCII_LOGO = r"""                        
                           .                                     
@@ -101,7 +99,7 @@ def bandpass_args():
     This function sets up an argument parser with two arguments:
     --fmin and --fmax, which define the minimum and maximum frequencies
     for the bandpass filter, respectively. The values are constrained
-    to be within the range defined by cfg.SIG_FMIN and cfg.SIG_FMAX.
+    to be within the range [0, 15000].
     Returns:
         argparse.ArgumentParser: The configured argument parser.
     """
@@ -109,14 +107,14 @@ def bandpass_args():
 
     p.add_argument(
         "--fmin",
-        type=lambda a: max(0, min(cfg.SIG_FMAX, int(a))),
-        default=cfg.SIG_FMIN,
+        type=lambda a: max(0, min(15000, int(a))),
+        default=0,
         help="Minimum frequency for bandpass filter in Hz.",
     )
     p.add_argument(
         "--fmax",
-        type=lambda a: max(cfg.SIG_FMIN, min(cfg.SIG_FMAX, int(a))),
-        default=cfg.SIG_FMAX,
+        type=lambda a: max(0, min(15000, int(a))),
+        default=15000,
         help="Maximum frequency for bandpass filter in Hz.",
     )
 
@@ -535,7 +533,7 @@ def search_parser():
     )
     parser.add_argument(
         "--crop_mode",
-        default=cfg.SAMPLE_CROP_MODE,
+        default="center",
         choices=["center", "first", "segments"],
         help="Crop mode for the query sample. Can be 'center', 'first' or 'segments'.",
     )
@@ -718,7 +716,7 @@ def train_parser():
     parser.add_argument("--test_data", help="Path to test data folder. If not specified, a random validation split will be used.")
     parser.add_argument(
         "--crop_mode",
-        default=cfg.SAMPLE_CROP_MODE,
+        default="center",
         choices=["center", "first", "segments", "smart"],
         help="Crop mode for training data. Can be 'center', 'first', 'segments' or 'smart'.",
     )
@@ -781,19 +779,19 @@ def train_parser():
     )
     parser.add_argument(
         "--upsampling_mode",
-        default=cfg.UPSAMPLING_MODE,
+        default="repeat",
         choices=["repeat", "linear", "mean", "smote"],
         help="Upsampling mode.",
     )
     parser.add_argument(
         "--model_format",
-        default=cfg.TRAINED_MODEL_OUTPUT_FORMAT,
+        default="tflite",
         choices=["tflite", "raven", "both"],
         help="Model output format.",
     )
     parser.add_argument(
         "--model_save_mode",
-        default=cfg.TRAINED_MODEL_SAVE_MODE,
+        default="replace",
         choices=["replace", "append"],
         help="Model save mode. 'replace' will overwrite the original classification layer and 'append' will combine the original classification layer with the new one.",
     )

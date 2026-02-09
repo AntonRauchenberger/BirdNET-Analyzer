@@ -1,22 +1,27 @@
+from __future__ import annotations
+
 import os
 from functools import partial
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import gradio as gr
-from birdnet.acoustic_models.inference.perf_tracker import AcousticProgressStats
-from birdnet.globals import MODEL_LANGUAGES
 
-import birdnet_analyzer.config as cfg
 import birdnet_analyzer.gui.utils as gu
 
+if TYPE_CHECKING:
+    from birdnet.acoustic_models.inference.perf_tracker import AcousticProgressStats
+    from birdnet.globals import MODEL_LANGUAGES
+
+    from birdnet_analyzer.config import ADDITIONAL_COLUMNS, RESULT_TYPES
+
+
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
-ORIGINAL_LABELS_FILE = str(Path(SCRIPT_DIR).parent / cfg.BIRDNET_LABELS_FILE)
 
 foo_counter = 0
 
 
 def on_progress(update: AcousticProgressStats, progress: gr.Progress):
-    global foo_counter
+    global foo_counter  # noqa: PLW0603
 
     progress(foo_counter / 10, desc="FOOOOOOO")
     print(f"\ncounter: {foo_counter}\n")
@@ -46,8 +51,8 @@ def run_analysis(
     sf_thresh: float,
     selected_model: str,
     custom_classifier_file,
-    output_types: cfg.RESULT_TYPES | list[cfg.RESULT_TYPES],
-    additional_columns: list[str] | None,
+    output_types: RESULT_TYPES | list[RESULT_TYPES],
+    additional_columns: list[ADDITIONAL_COLUMNS] | None,
     locale: MODEL_LANGUAGES,
     batch_size: int,
     input_dir: str | None,
@@ -124,6 +129,7 @@ def run_analysis(
         slist=slist,
         top_n=top_n if use_top_n else None,
         output=output_path,
+        merge_consecutive=merge_consecutive,
         additional_columns=additional_columns,
         model="perch" if use_perch else "birdnet",
         birdnet="2.4",

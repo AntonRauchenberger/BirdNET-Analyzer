@@ -123,14 +123,13 @@ def analyze(
         return predictions
 
     audio_input_path: Path = Path(audio_input)
-    output: Path = audio_input_path.parent if audio_input_path.is_file() else audio_input_path
-
     df = predictions.to_dataframe()
     # df = _merge_consecutive_segments(df, merge_consecutive, hop_size=predictions.hop_duration_s)
 
     df = _merge_consecutive_segments(df, merge_consecutive, hop_size=3.0)
 
     if split_tables:
+        output: Path = audio_input_path.parent if audio_input_path.is_file() else audio_input_path
         _split_tables(
             df,
             audio_input_path,
@@ -151,12 +150,12 @@ def analyze(
         )
 
     if "table" in rtypes:
-        save_as_rtable(df, fmin, fmax, predictions.model_fmin, predictions.model_fmax, audio_speed, output / cfg.OUTPUT_RAVEN_FILENAME)
+        save_as_rtable(df, fmin, fmax, predictions.model_fmin, predictions.model_fmax, audio_speed, Path(output) / cfg.OUTPUT_RAVEN_FILENAME)
 
     if "csv" in rtypes:
         save_as_csv(
             df,
-            output / cfg.OUTPUT_CSV_FILENAME,
+            Path(output) / cfg.OUTPUT_CSV_FILENAME,
             additional_columns,
             lat=lat,
             lon=lon,
@@ -169,10 +168,10 @@ def analyze(
         )
 
     if "kaleidoscope" in rtypes:
-        save_as_kaleidoscope(df, output / cfg.OUTPUT_KALEIDOSCOPE_FILENAME)
+        save_as_kaleidoscope(df, Path(output) / cfg.OUTPUT_KALEIDOSCOPE_FILENAME)
 
     if "audacity" in rtypes:
-        save_as_audacity(df, output / cfg.OUTPUT_AUDACITY_FILENAME)
+        save_as_audacity(df, Path(output) / cfg.OUTPUT_AUDACITY_FILENAME)
 
     if save_params:
         save_params_to_file(
@@ -439,15 +438,17 @@ def save_as_csv(
 
     if additional_columns:
         possible_cols = {
-            "lat": lat if lat is not None else "",
-            "lon": lon if lon is not None else "",
-            "week": week if week is not None else "",
-            "overlap": overlap,
-            "sensitivity": sensitivity,
-            "min_conf": min_conf,
-            "species_list": species_list_file,
-            "model": os.path.basename(model_path or ""),
+            "lat": [lat if lat is not None else ""],
+            "lon": [lon if lon is not None else ""],
+            "week": [week if week is not None else ""],
+            "overlap": [overlap if overlap is not None else ""],
+            "sensitivity": [sensitivity if sensitivity is not None else ""],
+            "min_conf": [min_conf if min_conf is not None else ""],
+            "species_list": [species_list_file],
+            "model": [os.path.basename(model_path or "")],
         }
+        additional_columns = [col for col in additional_columns if col in possible_cols]
+
         for col in possible_cols:
             if col in additional_columns:
                 df[col] = possible_cols[col] * n_rows
@@ -459,7 +460,8 @@ def save_as_csv(
         inplace=True,
     )
 
-    cols = ["Start (s)", "End (s)", "Scientific name", "Common name", "Confidence", "File"]
+    order = ["Start (s)", "End (s)", "Scientific name", "Common name", "Confidence", "File"]
+    cols = [*order, *additional_columns] if additional_columns else order
     df = df[cols]
 
     output.parent.mkdir(parents=True, exist_ok=True)

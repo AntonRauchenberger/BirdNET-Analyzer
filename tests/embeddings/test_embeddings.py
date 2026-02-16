@@ -21,6 +21,7 @@ def _make_empty_encoding_result():
     mock_result.embeddings_masked = np.zeros((0, 0, 1024), dtype=bool)
     mock_result.inputs = np.array([], dtype="<U1")
     mock_result.input_durations = np.array([])
+    mock_result.input_durations = np.array([])
     return mock_result
 
 

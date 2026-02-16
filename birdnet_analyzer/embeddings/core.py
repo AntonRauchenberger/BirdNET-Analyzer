@@ -140,7 +140,7 @@ def create_csv_output(output_path: str, database: str):
     db = _get_or_create_database(database)
     parent_dir = os.path.dirname(output_path)
 
-    if not os.path.exists(parent_dir):
+    if parent_dir and not os.path.exists(parent_dir):
         os.makedirs(parent_dir)
 
     window_ids = db.match_window_ids()
@@ -212,7 +212,7 @@ def _get_or_create_database(db_path: str, embedding_dim: int = 1024):
     from perch_hoplite.db import sqlite_usearch_impl
 
     if not os.path.exists(db_path):
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
 
         return sqlite_usearch_impl.SQLiteUSearchDB.create(
             db_path=db_path,

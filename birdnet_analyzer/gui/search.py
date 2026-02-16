@@ -178,9 +178,10 @@ def build_search_tab():
                                 for i, r in enumerate(results[page]):
                                     with gr.Column():
                                         index = i + page * PAGE_SIZE
-                                        embedding_source = db.get_embedding_source(r.embedding_id)
-                                        file = embedding_source.source_id
-                                        offset = embedding_source.offsets[0]
+                                        window = db.get_window(r.window_id)
+                                        recording = db.get_recording(window.recording_id)
+                                        file = recording.filename
+                                        offset = window.offsets[0]
                                         duration = 3.0 * settings["AUDIO_SPEED"]  # type: ignore
                                         spec = utils.spectrogram_from_file(
                                             file,

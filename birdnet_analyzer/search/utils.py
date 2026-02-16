@@ -11,7 +11,7 @@ from birdnet_analyzer import audio, model_utils
 from birdnet_analyzer.config import CROP_MODES, SCORE_FUNCTIONS
 
 if TYPE_CHECKING:
-    from perch_hoplite.db.sqlite_usearch_impl import SQLiteUsearchDB
+    from perch_hoplite.db.sqlite_usearch_impl import SQLiteUSearchDB
 
 
 def cosine_sim(a: np.ndarray, b: np.ndarray) -> float:
@@ -61,7 +61,7 @@ def get_query_embedding(
 
 def get_search_results(
     queryfile_path: str,
-    db: SQLiteUsearchDB,
+    db: SQLiteUSearchDB,
     n_results=10,
     audio_speed=1.0,
     fmin=0,
@@ -109,15 +109,15 @@ def get_search_results(
                 result.sort_score *= -1
 
         for result in sorted_results:
-            if result.embedding_id not in scores_by_embedding_id:
-                scores_by_embedding_id[result.embedding_id] = []
+            if result.window_id not in scores_by_embedding_id:
+                scores_by_embedding_id[result.window_id] = []
 
-            scores_by_embedding_id[result.embedding_id].append(result.sort_score)
+            scores_by_embedding_id[result.window_id].append(result.sort_score)
 
     search_results: list[SearchResult] = []
 
-    for embedding_id, scores in scores_by_embedding_id.items():
-        search_results.append(SearchResult(embedding_id, np.sum(scores) / len(query_embeddings)))
+    for window_id, scores in scores_by_embedding_id.items():
+        search_results.append(SearchResult(window_id=window_id, sort_score=np.sum(scores) / len(query_embeddings)))
 
     reverse = score_function != "euclidean"
 

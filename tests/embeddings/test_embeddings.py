@@ -3,10 +3,24 @@ import shutil
 import tempfile
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pytest
 
 from birdnet_analyzer.cli import embeddings_parser
 from birdnet_analyzer.embeddings.core import embeddings
+
+
+def _make_empty_encoding_result():
+    """Create a mock AcousticFileEncodingResult with zero inputs."""
+    mock_result = MagicMock()
+    mock_result.segment_duration_s = 3.0
+    mock_result.overlap_duration_s = 0.0
+    mock_result.n_inputs = 0
+    mock_result.max_n_segments = 0
+    mock_result.embeddings = np.zeros((0, 0, 1024), dtype=np.float32)
+    mock_result.embeddings_masked = np.zeros((0, 0, 1024), dtype=bool)
+    mock_result.inputs = np.array([], dtype="<U1")
+    return mock_result
 
 
 @pytest.fixture
@@ -40,7 +54,7 @@ def test_embeddings_cli(
 ):
     env = setup_test_environment
 
-    mock_get_embeddings.return_value = iter([])
+    mock_get_embeddings.return_value = _make_empty_encoding_result()
     mock_db = MagicMock()
     mock_get_db.return_value = mock_db
 

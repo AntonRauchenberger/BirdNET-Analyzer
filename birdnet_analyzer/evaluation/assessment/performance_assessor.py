@@ -188,7 +188,7 @@ class PerformanceAssessor:
                 metrics_results["Accuracy"] = np.atleast_1d(result)
 
         # Define column names for the DataFrame
-        columns = (self.classes if self.classes else [f"Class {i}" for i in range(self.num_classes)]) if per_class_metrics else ["Overall"]
+        columns = (self.classes or [f"Class {i}" for i in range(self.num_classes)]) if per_class_metrics else ["Overall"]
 
         # Create a DataFrame to organize metric results
         metrics_data = {key: np.atleast_1d(value) for key, value in metrics_results.items()}
@@ -352,7 +352,7 @@ class PerformanceAssessor:
 
             # Compute confusion matrices for each class
             conf_mats = []
-            class_names = self.classes if self.classes else [f"Class {i}" for i in range(self.num_classes)]
+            class_names = self.classes or [f"Class {i}" for i in range(self.num_classes)]
 
             for i in range(self.num_classes):
                 conf_mat = confusion_matrix(y_true[:, i], y_pred[:, i], normalize="true")

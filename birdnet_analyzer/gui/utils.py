@@ -265,7 +265,7 @@ def build_settings():
                         (loc.localize("settings-tab-theme-dropdown-dark-option"), "dark"),
                         (loc.localize("settings-tab-theme-dropdown-light-option"), "light"),
                     ],
-                    value=lambda: settings.theme(),
+                    value=lambda: settings.theme(),  # noqa: PLW0108
                     label=loc.localize("settings-tab-theme-dropdown-label"),
                     info="⚠️" + loc.localize("settings-tab-theme-dropdown-info"),
                     interactive=True,

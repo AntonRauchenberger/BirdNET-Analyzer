@@ -228,7 +228,7 @@ def build_review_tab():
             if target_dir:
                 selected_dir = os.path.join(
                     next_review_state["input_directory"],
-                    next_review_state["current_species"] if next_review_state["current_species"] else "",
+                    next_review_state["current_species"] or "",
                     target_dir,
                 )
 
@@ -356,13 +356,13 @@ def build_review_tab():
                     os.rename(
                         os.path.join(
                             next_review_state["input_directory"],
-                            next_review_state["current_species"] if next_review_state["current_species"] else "",
+                            next_review_state["current_species"] or "",
                             last_dir,
                             os.path.basename(last_file),
                         ),
                         os.path.join(
                             next_review_state["input_directory"],
-                            next_review_state["current_species"] if next_review_state["current_species"] else "",
+                            next_review_state["current_species"] or "",
                             os.path.basename(last_file),
                         ),
                     )

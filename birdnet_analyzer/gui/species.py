@@ -14,7 +14,7 @@ def run_species_list(out_path, filename, lat, lon, week, use_yearlong, sf_thresh
     gu.validate(out_path, loc.localize("validation-no-directory-selected"))
 
     run(
-        os.path.join(out_path, filename if filename else "species_list.txt"),
+        os.path.join(out_path, filename or "species_list.txt"),
         lat,
         lon,
         -1 if use_yearlong else week,

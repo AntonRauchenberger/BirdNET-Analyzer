@@ -182,19 +182,19 @@ def build_evaluation_tab():
             prediction_dir = save_uploaded_files(prediction_files)
 
         # Fallback for annotation columns.
-        ann_start_time = ann_start_time if ann_start_time else annotation_default_columns["Start Time"]
-        ann_end_time = ann_end_time if ann_end_time else annotation_default_columns["End Time"]
-        ann_class = ann_class if ann_class else annotation_default_columns["Class"]
-        ann_recording = ann_recording if ann_recording else annotation_default_columns["Recording"]
-        ann_duration = ann_duration if ann_duration else annotation_default_columns["Duration"]
+        ann_start_time = ann_start_time or annotation_default_columns["Start Time"]
+        ann_end_time = ann_end_time or annotation_default_columns["End Time"]
+        ann_class = ann_class or annotation_default_columns["Class"]
+        ann_recording = ann_recording or annotation_default_columns["Recording"]
+        ann_duration = ann_duration or annotation_default_columns["Duration"]
 
         # Fallback for prediction columns.
-        pred_start_time = pred_start_time if pred_start_time else prediction_default_columns["Start Time"]
-        pred_end_time = pred_end_time if pred_end_time else prediction_default_columns["End Time"]
-        pred_class = pred_class if pred_class else prediction_default_columns["Class"]
-        pred_confidence = pred_confidence if pred_confidence else prediction_default_columns["Confidence"]
-        pred_recording = pred_recording if pred_recording else prediction_default_columns["Recording"]
-        pred_duration = pred_duration if pred_duration else prediction_default_columns["Duration"]
+        pred_start_time = pred_start_time or prediction_default_columns["Start Time"]
+        pred_end_time = pred_end_time or prediction_default_columns["End Time"]
+        pred_class = pred_class or prediction_default_columns["Class"]
+        pred_confidence = pred_confidence or prediction_default_columns["Confidence"]
+        pred_recording = pred_recording or prediction_default_columns["Recording"]
+        pred_duration = pred_duration or prediction_default_columns["Duration"]
 
         cols_ann = {
             "Start Time": ann_start_time,
@@ -216,7 +216,7 @@ def build_evaluation_tab():
         if mapping_file_obj and hasattr(mapping_file_obj, "temp_files"):
             mapping_path = list(mapping_file_obj.temp_files)[0]
         else:
-            mapping_path = mapping_file_obj if mapping_file_obj else None
+            mapping_path = mapping_file_obj or None
 
         if mapping_path:
             with open(mapping_path) as f:
@@ -630,7 +630,7 @@ def build_evaluation_tab():
             if mapping_file_obj and hasattr(mapping_file_obj, "temp_files"):
                 mapping_path = list(mapping_file_obj.temp_files)[0]
             else:
-                mapping_path = mapping_file_obj if mapping_file_obj else None
+                mapping_path = mapping_file_obj or None
 
             try:
                 metrics_df, pa, preds, labs = process_data(

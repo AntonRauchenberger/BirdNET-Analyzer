@@ -79,7 +79,7 @@ def run_batch_analysis(
         custom_classifier_file=custom_classifier_file,
         output_types=output_type,
         additional_columns=additional_columns,
-        locale=locale if locale else MODEL_LANGUAGE_EN_US,
+        locale=locale or MODEL_LANGUAGE_EN_US,
         batch_size=batch_size if batch_size and batch_size > 0 else 1,
         input_dir=input_dir,
         save_params=True,

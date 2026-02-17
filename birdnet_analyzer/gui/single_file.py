@@ -69,7 +69,7 @@ def run_single_file_analysis(
         custom_classifier_file=custom_classifier_file,
         output_types="csv",
         additional_columns=None,
-        locale=locale if locale else "en_us",
+        locale=locale or "en_us",
         batch_size=1,
         input_dir=None,
         save_params=False,

@@ -456,7 +456,7 @@ def save_as_csv(
     df[["Scientific name", "Common name"]] = df["species_name"].str.split("_", n=1, expand=True)
 
     df.rename(
-        columns={"input": "File", "start_time": "Start (s)", "end_time": "End (s)", "confidence": "Confidence"},
+        columns={"Begin Path": "File", "Begin Time (s)": "Start (s)", "End Time (s)": "End (s)", "confidence": "Confidence"},
         inplace=True,
     )
 

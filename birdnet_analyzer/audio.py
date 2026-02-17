@@ -1,5 +1,7 @@
 """Module containing audio helper functions."""
 
+from math import isclose
+
 import librosa
 import numpy as np
 import soundfile as sf
@@ -10,7 +12,7 @@ import birdnet_analyzer.config as cfg
 RANDOM = np.random.RandomState(cfg.RANDOM_SEED)
 
 
-def open_audio_file(path: str, sample_rate=48000, offset=0.0, duration=None, fmin=None, fmax=None, speed=1.0):
+def open_audio_file(path: str, sample_rate=48000, offset=0.0, duration=None, fmin=None, fmax=None, speed=1.0, sig_fmin=0, sig_fmax=15000):
     """Open an audio file.
 
     Opens an audio file with librosa and the given settings.
@@ -22,6 +24,8 @@ def open_audio_file(path: str, sample_rate=48000, offset=0.0, duration=None, fmi
         duration: Maximum duration of the loaded content.
         fmin: Minimum frequency for bandpass filter.
         fmax: Maximum frequency for bandpass filter.
+        sig_fmin: Minimum frequency of the original signal.
+        sig_fmax: Maximum frequency of the original signal.
         speed: Speed factor for audio playback.
 
     Returns:
@@ -41,7 +45,7 @@ def open_audio_file(path: str, sample_rate=48000, offset=0.0, duration=None, fmi
 
     # Bandpass filter
     if fmin is not None and fmax is not None:
-        sig = bandpass(sig, rate, fmin, fmax)
+        sig = bandpass(sig, rate, fmin, fmax, sig_fmin=sig_fmin, sig_fmax=sig_fmax)
         # sig = bandpassKaiserFIR(sig, rate, fmin, fmax)
 
     return sig, rate
@@ -107,13 +111,14 @@ def save_signal(sig, fname: str, rate=48000):
     sf.write(fname, sig, rate, "PCM_16")
 
 
-def pad(sig, seconds, srate, amount=None):
+def pad(sig, seconds, srate, amount=None, use_noise=False):
     """Creates a noise vector with the given shape.
 
     Args:
         sig: The original audio signal.
         shape: Shape of the noise.
         amount: The noise intensity.
+        use_noise: Whether to use noise or zeros for padding.
 
     Returns:
         An numpy array of noise with the given shape.
@@ -124,10 +129,7 @@ def pad(sig, seconds, srate, amount=None):
     if len(sig) < target_len:
         noise_shape = target_len - len(sig)
 
-        if not cfg.USE_NOISE:
-            noise = np.zeros(noise_shape, dtype=sig.dtype)
-        else:
-            # Random noise intensity
+        if not use_noise:
             if amount is None:
                 amount = RANDOM.uniform(0.1, 0.5)
 
@@ -136,13 +138,15 @@ def pad(sig, seconds, srate, amount=None):
                 noise = RANDOM.normal(min(sig) * amount, max(sig) * amount, noise_shape).astype(sig.dtype)
             except:
                 noise = np.zeros(noise_shape, dtype=sig.dtype)
+        else:
+            noise = np.zeros(noise_shape, dtype=sig.dtype)
 
         return np.concatenate((sig, noise))
 
     return sig
 
 
-def split_signal(sig, rate, seconds, overlap, minlen, amount=None):
+def split_signal(sig, rate, seconds=3.0, overlap=0.0, minlen=1.0, amount=None, use_noise_for_padding=False):
     """Split signal with overlap.
 
     Args:
@@ -151,23 +155,24 @@ def split_signal(sig, rate, seconds, overlap, minlen, amount=None):
         seconds: The duration of a segment.
         overlap: The overlapping seconds of segments.
         minlen: Minimum length of a split.
-
+        use_noise_for_padding: Whether to use noise for padding.
     Returns:
         A list of splits.
     """
 
-    # Split signal to chunks of duration with overlap, whereas each chunk still has minimum duration of signal
     if rate is None or rate <= 0:
-        rate = cfg.SAMPLE_RATE
+        raise ValueError("Invalid sample rate")
     if seconds is None or seconds <= 0:
-        seconds = cfg.SIG_LENGTH
+        raise ValueError("Invalid segment duration")
     if overlap is None or overlap < 0:
-        overlap = cfg.SIG_OVERLAP
+        raise ValueError("Invalid overlap duration")
     if minlen is None or minlen <= 0 or minlen > seconds:
-        minlen = cfg.SIG_MINLEN
+        raise ValueError("Invalid minimum segment length")
+    if overlap >= seconds:
+        raise ValueError("Overlap must be smaller than segment duration")
 
     # Make sure overlap is smaller then signal duration
-    if overlap >= seconds:
+    if isclose(overlap, seconds):
         overlap = seconds - 0.01
 
     # Number of frames per chunk, per step and per minimum signal
@@ -185,9 +190,7 @@ def split_signal(sig, rate, seconds, overlap, minlen, amount=None):
         lastchunkpos = lastchunkpos - stepsize
 
     # Append noise or empty signal of chunk duration, so all splits have desired length
-    if not cfg.USE_NOISE:
-        noise = np.zeros(shape=chunksize, dtype=sig.dtype)
-    else:
+    if not use_noise_for_padding:
         # Random noise intensity
         if amount is None:
             amount = RANDOM.uniform(0.1, 0.5)
@@ -196,6 +199,9 @@ def split_signal(sig, rate, seconds, overlap, minlen, amount=None):
             noise = RANDOM.normal(loc=min(sig) * amount, scale=max(sig) * amount, size=chunksize).astype(sig.dtype)
         except:
             noise = np.zeros(shape=chunksize, dtype=sig.dtype)
+    else:
+        noise = np.zeros(shape=chunksize, dtype=sig.dtype)
+
     data = np.concatenate((sig, noise))
 
     # Split signal with overlap
@@ -220,8 +226,6 @@ def crop_center(sig, rate, seconds):
         start = int((len(sig) - int(seconds * rate)) / 2)
         end = start + int(seconds * rate)
         sig = sig[start:end]
-
-    # Pad with noise
     else:
         sig = pad(sig, seconds, rate, 0.5)
 
@@ -290,7 +294,7 @@ def smart_crop_signal(sig, rate, sig_length, sig_overlap, sig_minlen):
     return peak_splits
 
 
-def bandpass(sig, rate, fmin, fmax, order=5):
+def bandpass(sig, rate, fmin, fmax, order=5, sig_fmin=0, sig_fmax=15000):
     """
     Apply a bandpass filter to the input signal.
 
@@ -300,12 +304,14 @@ def bandpass(sig, rate, fmin, fmax, order=5):
         fmin (float): The minimum frequency for the bandpass filter.
         fmax (float): The maximum frequency for the bandpass filter.
         order (int, optional): The order of the filter. Default is 5.
+        sig_fmin (float, optional): The minimum frequency of the original signal. Default is 0.
+        sig_fmax (float, optional): The maximum frequency of the original signal. Default is 15000.
 
     Returns:
         numpy.ndarray: The filtered signal as a float32 array.
     """
     # Check if we have to bandpass at all
-    if (fmin == cfg.SIG_FMIN and fmax == cfg.SIG_FMAX) or fmin > fmax:
+    if (fmin == sig_fmin and fmax == sig_fmax) or fmin > fmax:
         return sig
 
     from scipy.signal import butter, lfilter
@@ -313,19 +319,19 @@ def bandpass(sig, rate, fmin, fmax, order=5):
     nyquist = 0.5 * rate
 
     # Highpass?
-    if fmin > cfg.SIG_FMIN and fmax == cfg.SIG_FMAX:
+    if fmin > sig_fmin and fmax == sig_fmax:
         low = fmin / nyquist
         b, a = butter(order, low, btype="high")
         sig = lfilter(b, a, sig)
 
     # Lowpass?
-    elif fmin == cfg.SIG_FMIN and fmax < cfg.SIG_FMAX:
+    elif fmin == sig_fmin and fmax < sig_fmax:
         high = fmax / nyquist
         b, a = butter(order, high, btype="low")
         sig = lfilter(b, a, sig)
 
     # Bandpass?
-    elif fmin > cfg.SIG_FMIN and fmax < cfg.SIG_FMAX:
+    elif fmin > sig_fmin and fmax < sig_fmax:
         low = fmin / nyquist
         high = fmax / nyquist
         b, a = butter(order, [low, high], btype="band")
@@ -340,6 +346,8 @@ def bandpass(sig, rate, fmin, fmax, order=5):
 # the Nyquist frequency and a default stop band attenuation of 100 dB.
 # For a complete description of this method, see Discrete-Time Signal Processing
 # (Second Edition), by Alan Oppenheim, Ronald Schafer, and John Buck, Prentice Hall 1998, pp. 474-476.
+# TODO: deprecated, but not used anywhere
+# If neeeded in the future, replace the config values with fuction arguments
 def bandpass_kaiser_fir(sig, rate, fmin, fmax, width=0.02, stopband_attenuation_db=100):
     """
     Applies a bandpass filter to the given signal using a Kaiser window FIR filter.

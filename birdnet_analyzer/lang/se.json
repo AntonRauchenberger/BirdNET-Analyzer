@@ -231,6 +231,8 @@
     "settings-tab-title": "Inställningar",
     "single-audio-label": "Fil",
     "single-tab-analyze-file-error": "Kunde inte analysera filen",
+    "single-tab-download-csv-button-label": "Ladda ner CSV",
+    "single-tab-download-kaleidoscope-button-label": "Ladda ner Kaleidoscope-tabell",
     "single-tab-download-rtable-button-label": "Ladda ner tabellen ”Raven”",
     "single-tab-generate-spectrogram-error": "Kunde inte generera spektrogram",
     "single-tab-output-header-common-name": "Svenskt namn",

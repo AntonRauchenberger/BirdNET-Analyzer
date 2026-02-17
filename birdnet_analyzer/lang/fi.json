@@ -231,6 +231,8 @@
     "settings-tab-title": "Asetukset",
     "single-audio-label": "Tiedosto",
     "single-tab-analyze-file-error": "Tiedoston analysointi epäonnistui",
+    "single-tab-download-csv-button-label": "Lataa CSV",
+    "single-tab-download-kaleidoscope-button-label": "Lataa Kaleidoscope-taulukko",
     "single-tab-download-rtable-button-label": "Lataa Raven-taulukko",
     "single-tab-generate-spectrogram-error": "Spektrogrammin luonti epäonnistui",
     "single-tab-output-header-common-name": "Yleisnimi",

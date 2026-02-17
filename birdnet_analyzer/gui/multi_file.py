@@ -146,7 +146,7 @@ def build_multi_analysis_tab():
 
         sample_settings, species_settings, model_settings = gu.sample_species_model_settings(opened=False)
 
-        with gr.Accordion(loc.localize("multi-tab-output-accordion-label"), open=True), gr.Group():
+        with gr.Group(), gr.Accordion(loc.localize("multi-tab-output-accordion-label"), open=True):
             output_type_radio = gr.CheckboxGroup(
                 list(OUTPUT_TYPE_MAP.items()),
                 value="table",

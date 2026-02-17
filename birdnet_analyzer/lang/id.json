@@ -231,6 +231,8 @@
     "settings-tab-title": "Pengaturan",
     "single-audio-label": "file",
     "single-tab-analyze-file-error": "Tidak dapat menganalisis file",
+    "single-tab-download-csv-button-label": "Unduh CSV",
+    "single-tab-download-kaleidoscope-button-label": "Unduh tabel Kaleidoscope",
     "single-tab-download-rtable-button-label": "Unduh tabel “Raven”",
     "single-tab-generate-spectrogram-error": "Tidak dapat menghasilkan spektrogram",
     "single-tab-output-header-common-name": "Nama umum",

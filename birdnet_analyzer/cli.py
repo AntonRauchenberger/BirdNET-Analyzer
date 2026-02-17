@@ -202,7 +202,7 @@ def overlap_args(help_string="Overlap of prediction segments. Values in [0.0, 2.
     Creates an argument parser for the overlap of prediction segments.
     Args:
         help_string (str): A custom help string for the overlap argument. Defaults to a formatted string
-                           indicating the range [0.0, 2.9] and the default value from cfg.SIG_OVERLAP.
+                           indicating the range [0.0, 2.9].
     Returns:
         argparse.ArgumentParser: An argument parser with the overlap argument configured.
     """

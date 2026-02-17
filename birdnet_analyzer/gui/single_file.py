@@ -128,9 +128,10 @@ def build_single_analysis_tab():
         single_file_analyze = gr.Button(loc.localize("analyze-start-button-label"), variant="huggingface", interactive=False)
 
         with gr.Row(visible=False) as action_row:
-            rtable_download_button = gr.Button(loc.localize("single-tab-download-rtable-button-label"))
-            csv_download_button = gr.Button(loc.localize("single-tab-download-csv-button-label"))
-            kaleidoscope_download_button = gr.Button(loc.localize("single-tab-download-kaleidoscope-button-label"))
+            with gr.Group(), gr.Column():
+                rtable_download_button = gr.Button(loc.localize("single-tab-download-rtable-button-label"))
+                csv_download_button = gr.Button(loc.localize("single-tab-download-csv-button-label"))
+                kaleidoscope_download_button = gr.Button(loc.localize("single-tab-download-kaleidoscope-button-label"))
             segment_audio = gr.Audio(autoplay=True, type="numpy", show_download_button=True, show_label=False, editable=False, visible=False)
 
         output_dataframe = gr.Dataframe(

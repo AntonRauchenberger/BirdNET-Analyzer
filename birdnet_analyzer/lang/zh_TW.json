@@ -231,6 +231,8 @@
     "settings-tab-title": "設定",
     "single-audio-label": "檔案",
     "single-tab-analyze-file-error": "無法分析文件",
+    "single-tab-download-csv-button-label": "下載 CSV",
+    "single-tab-download-kaleidoscope-button-label": "下載 Kaleidoscope 表格",
     "single-tab-download-rtable-button-label": "下載「烏鴉」表格",
     "single-tab-generate-spectrogram-error": "無法生成頻譜圖",
     "single-tab-output-header-common-name": "俗名",

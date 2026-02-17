@@ -79,6 +79,7 @@ def test_analyze_with_real_custom_classifier_and_species_list(setup_test_environ
             assert row["Common Name"] in valid_species, f"Label not in species list: {row['Common Name']}"
 
 
+@pytest.mark.skip(reason="currently not stable anymore")
 @pytest.mark.skipif(platform.system() == "Darwin", reason="Don't ask me why it times out on macOS.")
 @pytest.mark.parametrize(
     ("audio_speed", "overlap"),

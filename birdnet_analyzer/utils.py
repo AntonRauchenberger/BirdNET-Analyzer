@@ -44,7 +44,7 @@ def batched(iterable, n, *, strict=False):
         yield batch
 
 
-def spectrogram_from_file(path, fig_num=None, fig_size=None, offset=0, duration=None, fmin=None, fmax=None, speed=1.0):
+def spectrogram_from_file(path, fig_num=None, fig_size=None, offset=0, duration=None, fmin=None, fmax=None, speed=1.0, sig_fmin=0, sig_fmax=15000):
     """
     Generate a spectrogram from an audio file.
 
@@ -56,7 +56,7 @@ def spectrogram_from_file(path, fig_num=None, fig_size=None, offset=0, duration=
     """
     from birdnet_analyzer import audio
 
-    s, sr = audio.open_audio_file(path, offset=offset, duration=duration, fmin=fmin, fmax=fmax, speed=speed)
+    s, sr = audio.open_audio_file(path, offset=offset, duration=duration, fmin=fmin, fmax=fmax, speed=speed, sig_fmin=sig_fmin, sig_fmax=sig_fmax)
 
     return spectrogram_from_audio(s, sr, fig_num=fig_num, fig_size=fig_size)
 

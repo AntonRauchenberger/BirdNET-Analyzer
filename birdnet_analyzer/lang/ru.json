@@ -231,6 +231,8 @@
     "settings-tab-title": "Настройки",
     "single-audio-label": "файл",
     "single-tab-analyze-file-error": "Невозможно проанализировать файл",
+    "single-tab-download-csv-button-label": "Скачать CSV",
+    "single-tab-download-kaleidoscope-button-label": "Скачать таблицу Kaleidoscope",
     "single-tab-download-rtable-button-label": "Скачать таблицу «Raven»",
     "single-tab-generate-spectrogram-error": "Невозможно создать спектрограмму",
     "single-tab-output-header-common-name": "Общее название",

@@ -104,6 +104,7 @@ def run_analysis(
     lat = lat if species_list_choice == gu._PREDICT_SPECIES else None
     lon = lon if species_list_choice == gu._PREDICT_SPECIES else None
     week = None if use_yearlong else week
+    audio_speed = max(0.1, 1.0 / (audio_speed * -1)) if audio_speed < 0 else max(1.0, float(audio_speed))
 
     if selected_model == gu._CUSTOM_CLASSIFIER and custom_classifier_file is None:
         raise gr.Error(loc.localize("validation-no-custom-classifier-selected"))

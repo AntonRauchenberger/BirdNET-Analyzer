@@ -149,7 +149,7 @@ def build_embeddings_tab():
                 show_progress="hidden",
             )
 
-        with gr.Accordion(loc.localize("embedding-settings-accordion-label"), open=False):
+        with gr.Group(), gr.Accordion(loc.localize("embedding-settings-accordion-label"), open=False):
             with gr.Row():
                 overlap_slider = gr.Slider(
                     minimum=0,

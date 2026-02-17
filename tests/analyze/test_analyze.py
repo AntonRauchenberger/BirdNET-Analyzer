@@ -157,7 +157,7 @@ def test_analyze_with_additional_columns(setup_test_environment):
 
     with open(output_file) as f:
         reader = csv.DictReader(f)
-        headers = reader.fieldnames
+        headers: list[str] = reader.fieldnames
         assert "lat" in headers, "Latitude column not found in output"
         assert "lon" in headers, "Longitude column not found in output"
         assert "week" in headers, "Week column not found in output"

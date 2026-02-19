@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
+import numpy as np
 from tqdm import tqdm
 
 if TYPE_CHECKING:
@@ -79,7 +80,7 @@ def embeddings(
     )
 
     batchsize = COMMIT_BS_SIZE
-    batch = 0
+    pending_since_commit = 0
     db = _get_or_create_database(database)
     _check_database_settings(db, fmin=fmin, fmax=fmax, audio_speed=audio_speed)
     deployment_id = _ensure_deployment(db)
@@ -97,6 +98,9 @@ def embeddings(
     for i in tqdm(range(n_inputs), desc="Saving embeddings to database", total=n_inputs):
         fpath = str(result.inputs[i])
         file_dur = float(input_durations[i])
+        recording_id = _ensure_recording(db, fpath, deployment_id)
+        windows_batch = []
+        embeddings_batch = []
 
         for j in range(n_segments):
             # Skip masked (invalid/padded) segments
@@ -113,14 +117,25 @@ def embeddings(
             # Clamp end to actual file duration
             s_end = min(s_end, file_dur)
 
-            embedding = result.embeddings[i, j, :]
+            windows_batch.append(
+                {
+                    "recording_id": recording_id,
+                    "offsets": [float(s_start), float(s_end)],
+                }
+            )
+            embeddings_batch.append(result.embeddings[i, j, :])
 
-            if _try_consume_embedding(fpath, s_start, s_end, embedding, db, deployment_id=deployment_id):
-                batch += 1
+        if windows_batch:
+            db.insert_windows_batch(
+                windows_batch=windows_batch,
+                embeddings_batch=np.asarray(embeddings_batch),
+                handle_duplicates="skip",
+            )
+            pending_since_commit += len(windows_batch)
 
-            if batch >= batchsize:
+            if pending_since_commit >= batchsize:
                 db.commit()
-                batch = 0
+                pending_since_commit = 0
 
     db.commit()
     db.db.close()

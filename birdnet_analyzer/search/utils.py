@@ -14,6 +14,22 @@ if TYPE_CHECKING:
     from perch_hoplite.db.sqlite_usearch_impl import SQLiteUSearchDB
 
 
+def _get_usearch_metric_name(db: SQLiteUSearchDB) -> str | None:
+    try:
+        usearch_cfg = db.get_metadata("usearch_config")
+    except KeyError:
+        return None
+    return str(usearch_cfg.get("metric_name", "")).upper() or None
+
+
+def _search_ann_ip(db: SQLiteUSearchDB, query_embedding: np.ndarray, n_results: int) -> list[SearchResult]:
+    matches = db.ui.search(query_embedding, count=n_results)
+    return [
+        SearchResult(window_id=int(window_id), sort_score=float(score))
+        for window_id, score in zip(matches.keys, matches.distances)
+    ]
+
+
 def cosine_sim(a: np.ndarray, b: np.ndarray) -> float:
     if a.ndim == 2:
         return np.array([cosine_sim(a[i], b) for i in range(a.shape[0])])
@@ -98,13 +114,23 @@ def get_search_results(
 
     db_embeddings_count = db.count_embeddings()
     n_results = min(n_results, db_embeddings_count - 1)
+    if n_results <= 0:
+        return []
+
+    usearch_metric_name = _get_usearch_metric_name(db)
+    # ANN path is currently safe only for inner product scoring.
+    use_ann = score_function == "dot" and usearch_metric_name == "IP"
+
     scores_by_embedding_id: dict[int, list[float]] = {}
 
     for embedding in query_embeddings:
-        results, scores = brutalism.threaded_brute_search(db, embedding, n_results, score_fn)
-        sorted_results = results.search_results
+        if use_ann:
+            sorted_results = _search_ann_ip(db, embedding, n_results)
+        else:
+            results, scores = brutalism.threaded_brute_search(db, embedding, n_results, score_fn)
+            sorted_results = results.search_results
 
-        if score_function == "euclidean":
+        if not use_ann and score_function == "euclidean":
             for result in sorted_results:
                 result.sort_score *= -1
 

@@ -124,9 +124,7 @@ def analyze(
 
     audio_input_path: Path = Path(audio_input)
     df = predictions.to_dataframe()
-    # df = _merge_consecutive_segments(df, merge_consecutive, hop_size=predictions.hop_duration_s)
-
-    df = _merge_consecutive_segments(df, merge_consecutive, hop_size=3.0)
+    df = _merge_consecutive_segments(df, merge_consecutive, hop_size=predictions.hop_duration_s)
 
     if split_tables:
         output: Path = audio_input_path.parent if audio_input_path.is_file() else audio_input_path

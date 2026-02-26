@@ -63,11 +63,12 @@ def search(
     results = get_search_results(queryfile, db, n_results, audio_speed, fmin, fmax, score_function, crop_mode, overlap, sig_length)
 
     for r in results:
-        embedding_source = db.get_embedding_source(r.embedding_id)
-        file = embedding_source.source_id
+        window = db.get_window(r.window_id)
+        recording = db.get_recording(window.recording_id)
+        file = recording.filename
         filebasename = os.path.basename(file)
         filebasename = os.path.splitext(filebasename)[0]
-        offset = embedding_source.offsets[0]
+        offset = window.offsets[0]
         sig, rate = audio.open_audio_file(file, offset=offset, duration=duration, sample_rate=None)
         result_path = os.path.join(output, f"{r.sort_score:.5f}_{filebasename}_{offset}_{offset + duration}.wav")
         audio.save_signal(sig, result_path, rate) # type: ignore
@@ -78,4 +79,4 @@ def search(
 def get_database(database_path):
     from perch_hoplite.db import sqlite_usearch_impl
 
-    return sqlite_usearch_impl.SQLiteUsearchDB.create(database_path)
+    return sqlite_usearch_impl.SQLiteUSearchDB.create(database_path)

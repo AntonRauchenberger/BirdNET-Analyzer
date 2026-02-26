@@ -113,9 +113,13 @@ def get_embeddings_array(
     callback: Callable[[AcousticProgressStats], None] | None = None,
 ) -> np.ndarray:
     model = birdnet.load("acoustic", version, "tf")
+    sr = model.get_sample_rate()
 
-    return model.encode_array(
-        signals,
+    # encode_array was removed; use encode_session + run_arrays instead.
+    # run_arrays expects (ndarray, sample_rate) tuples.
+    inputs = [(sig, sr) for sig in signals]
+
+    with model.encode_session(
         batch_size=batch_size,
         prefetch_ratio=prefetch_ratio,
         bandpass_fmin=bandpass_fmin,
@@ -124,7 +128,13 @@ def get_embeddings_array(
         progress_callback=callback,
         n_workers=n_workers,
         n_feeders=n_producers,
-    )
+    ) as session:
+        result = session.run_arrays(inputs)
+
+    # result.embeddings has shape (n_inputs, n_segments, embed_dim).
+    # Each input signal is a single segment, so squeeze the middle dim.
+    # Return shape: (n_inputs, embed_dim)
+    return result.embeddings[:, 0, :]
 
 
 def get_species_list(lat: float, lon: float, week: int | None, lang: MODEL_LANGUAGES = "en_us", threshold: float = 0.03) -> list[str]:

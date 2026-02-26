@@ -11,7 +11,23 @@ from birdnet_analyzer import audio, model_utils
 from birdnet_analyzer.config import CROP_MODES, SCORE_FUNCTIONS
 
 if TYPE_CHECKING:
-    from perch_hoplite.db.sqlite_usearch_impl import SQLiteUsearchDB
+    from perch_hoplite.db.sqlite_usearch_impl import SQLiteUSearchDB
+
+
+def _get_usearch_metric_name(db: SQLiteUSearchDB) -> str | None:
+    try:
+        usearch_cfg = db.get_metadata("usearch_config")
+    except KeyError:
+        return None
+    return str(usearch_cfg.get("metric_name", "")).upper() or None
+
+
+def _search_ann_ip(db: SQLiteUSearchDB, query_embedding: np.ndarray, n_results: int) -> list[SearchResult]:
+    matches = db.ui.search(query_embedding, count=n_results)
+    return [
+        SearchResult(window_id=int(window_id), sort_score=float(score))
+        for window_id, score in zip(matches.keys, matches.distances)
+    ]
 
 
 def cosine_sim(a: np.ndarray, b: np.ndarray) -> float:
@@ -61,7 +77,7 @@ def get_query_embedding(
 
 def get_search_results(
     queryfile_path: str,
-    db: SQLiteUsearchDB,
+    db: SQLiteUSearchDB,
     n_results=10,
     audio_speed=1.0,
     fmin=0,
@@ -98,26 +114,36 @@ def get_search_results(
 
     db_embeddings_count = db.count_embeddings()
     n_results = min(n_results, db_embeddings_count - 1)
+    if n_results <= 0:
+        return []
+
+    usearch_metric_name = _get_usearch_metric_name(db)
+    # ANN path is currently safe only for inner product scoring.
+    use_ann = score_function == "dot" and usearch_metric_name == "IP"
+
     scores_by_embedding_id: dict[int, list[float]] = {}
 
     for embedding in query_embeddings:
-        results, scores = brutalism.threaded_brute_search(db, embedding, n_results, score_fn)
-        sorted_results = results.search_results
+        if use_ann:
+            sorted_results = _search_ann_ip(db, embedding, n_results)
+        else:
+            results, scores = brutalism.threaded_brute_search(db, embedding, n_results, score_fn)
+            sorted_results = results.search_results
 
-        if score_function == "euclidean":
+        if not use_ann and score_function == "euclidean":
             for result in sorted_results:
                 result.sort_score *= -1
 
         for result in sorted_results:
-            if result.embedding_id not in scores_by_embedding_id:
-                scores_by_embedding_id[result.embedding_id] = []
+            if result.window_id not in scores_by_embedding_id:
+                scores_by_embedding_id[result.window_id] = []
 
-            scores_by_embedding_id[result.embedding_id].append(result.sort_score)
+            scores_by_embedding_id[result.window_id].append(result.sort_score)
 
     search_results: list[SearchResult] = []
 
-    for embedding_id, scores in scores_by_embedding_id.items():
-        search_results.append(SearchResult(embedding_id, np.sum(scores) / len(query_embeddings)))
+    for window_id, scores in scores_by_embedding_id.items():
+        search_results.append(SearchResult(window_id=window_id, sort_score=np.sum(scores) / len(query_embeddings)))
 
     reverse = score_function != "euclidean"
 

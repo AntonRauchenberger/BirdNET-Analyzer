@@ -266,6 +266,6 @@ def _try_get_database(db_path: str):
     from perch_hoplite.db import sqlite_usearch_impl
 
     try:
-        return sqlite_usearch_impl.SQLiteUsearchDB.create(db_path=db_path)
+        return sqlite_usearch_impl.SQLiteUSearchDB.create(db_path=db_path)
     except ValueError:
         return None

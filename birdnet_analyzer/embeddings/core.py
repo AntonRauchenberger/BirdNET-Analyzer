@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
+import numpy as np
 from tqdm import tqdm
 
 if TYPE_CHECKING:
@@ -79,17 +80,62 @@ def embeddings(
     )
 
     batchsize = COMMIT_BS_SIZE
-    batch = 0
+    pending_since_commit = 0
     db = _get_or_create_database(database)
     _check_database_settings(db, fmin=fmin, fmax=fmax, audio_speed=audio_speed)
+    deployment_id = _ensure_deployment(db)
 
-    for row in tqdm(result, desc="Saving embeddings to database"):
-        if _try_consume_embedding(row["input"], row["start_time"], row["end_time"], row["embedding"], db):
-            batch += 1
+    # Iterate over files and segments in the encoding result.
+    seg_dur = result.segment_duration_s
+    seg_overlap = result.overlap_duration_s
+    step = seg_dur - seg_overlap
 
-        if batch >= batchsize:
-            db.commit()
-            batch = 0
+    n_inputs = result.n_inputs
+    n_segments = result.max_n_segments
+    emb_masked = result.embeddings_masked
+    input_durations = result.input_durations
+
+    for i in tqdm(range(n_inputs), desc="Saving embeddings to database", total=n_inputs):
+        fpath = str(result.inputs[i])
+        file_dur = float(input_durations[i])
+        recording_id = _ensure_recording(db, fpath, deployment_id)
+        windows_batch = []
+        embeddings_batch = []
+
+        for j in range(n_segments):
+            # Skip masked (invalid/padded) segments
+            if emb_masked[i, j, 0]:
+                continue
+
+            s_start = j * step
+            s_end = s_start + seg_dur
+
+            # Skip segments whose start is beyond the actual file duration
+            if s_start >= file_dur:
+                continue
+
+            # Clamp end to actual file duration
+            s_end = min(s_end, file_dur)
+
+            windows_batch.append(
+                {
+                    "recording_id": recording_id,
+                    "offsets": [float(s_start), float(s_end)],
+                }
+            )
+            embeddings_batch.append(result.embeddings[i, j, :])
+
+        if windows_batch:
+            db.insert_windows_batch(
+                windows_batch=windows_batch,
+                embeddings_batch=np.asarray(embeddings_batch),
+                handle_duplicates="skip",
+            )
+            pending_since_commit += len(windows_batch)
+
+            if pending_since_commit >= batchsize:
+                db.commit()
+                pending_since_commit = 0
 
     db.commit()
     db.db.close()
@@ -109,39 +155,64 @@ def create_csv_output(output_path: str, database: str):
     db = _get_or_create_database(database)
     parent_dir = os.path.dirname(output_path)
 
-    if not os.path.exists(parent_dir):
+    if parent_dir and not os.path.exists(parent_dir):
         os.makedirs(parent_dir)
 
-    embedding_ids = db.get_embedding_ids()
+    window_ids = db.match_window_ids()
 
     csv_content = "file_path,start,end,embedding\n"
 
-    for embedding_id in embedding_ids:
-        embedding = db.get_embedding(embedding_id)
-        source = db.get_embedding_source(embedding_id)
+    for window_id in window_ids:
+        embedding = db.get_embedding(window_id)
+        window = db.get_window(window_id)
+        recording = db.get_recording(window.recording_id)
 
-        start, end = source.offsets
+        start, end = window.offsets
 
-        csv_content += f'{source.source_id},{start},{end},"{",".join(map(str, embedding.tolist()))}"\n'
+        csv_content += f'{recording.filename},{start},{end},"{",".join(map(str, embedding.tolist()))}"\n'
 
     with open(output_path, "w") as f:
         f.write(csv_content)
 
 
-def _try_consume_embedding(fpath, s_start, s_end, embeddings, db: sqlite_usearch_impl.SQLiteUsearchDB, dataset_name: str = DATASET_NAME):
-    import numpy as np
-    from perch_hoplite.db import interface as hoplite
+def _ensure_deployment(db: sqlite_usearch_impl.SQLiteUSearchDB, dataset_name: str = DATASET_NAME) -> int:
+    """Ensure the BirdNET deployment exists and return its id."""
+    from ml_collections import config_dict
 
-    existing_embedding = db.get_embeddings_by_source(dataset_name, fpath, np.array([s_start, s_end]))
+    deployments = db.get_all_deployments(
+        config_dict.create(eq=dict(name="birdnet_default", project=dataset_name))
+    )
+    if deployments:
+        return deployments[0].id
+    return db.insert_deployment(name="birdnet_default", project=dataset_name)
 
-    if existing_embedding.size == 0:
-        embeddings_source = hoplite.EmbeddingSource(dataset_name, fpath, np.array([s_start, s_end]))
 
-        db.insert_embedding(embeddings, embeddings_source)
+def _ensure_recording(db: sqlite_usearch_impl.SQLiteUSearchDB, fpath: str, deployment_id: int) -> int:
+    """Ensure the recording exists and return its id."""
+    from ml_collections import config_dict
 
-        return True
+    recordings = db.get_all_recordings(
+        config_dict.create(eq=dict(filename=fpath, deployment_id=deployment_id))
+    )
+    if recordings:
+        return recordings[0].id
+    return db.insert_recording(filename=fpath, deployment_id=deployment_id)
 
-    return False
+
+def _try_consume_embedding(fpath, s_start, s_end, embeddings, db: sqlite_usearch_impl.SQLiteUSearchDB, deployment_id: int | None = None, dataset_name: str = DATASET_NAME):
+    if deployment_id is None:
+        deployment_id = _ensure_deployment(db, dataset_name)
+
+    recording_id = _ensure_recording(db, fpath, deployment_id)
+
+    db.insert_window(
+        recording_id=recording_id,
+        offsets=[float(s_start), float(s_end)],
+        embedding=embeddings,
+        handle_duplicates="skip",
+    )
+
+    return True
 
 
 def _get_or_create_database(db_path: str, embedding_dim: int = 1024):
@@ -156,20 +227,20 @@ def _get_or_create_database(db_path: str, embedding_dim: int = 1024):
     from perch_hoplite.db import sqlite_usearch_impl
 
     if not os.path.exists(db_path):
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
 
-        return sqlite_usearch_impl.SQLiteUsearchDB.create(
+        return sqlite_usearch_impl.SQLiteUSearchDB.create(
             db_path=db_path,
             usearch_cfg=sqlite_usearch_impl.get_default_usearch_config(embedding_dim=embedding_dim),
         )
 
     try:
-        return sqlite_usearch_impl.SQLiteUsearchDB.create(db_path=db_path)
+        return sqlite_usearch_impl.SQLiteUSearchDB.create(db_path=db_path)
     except ValueError:
-        return sqlite_usearch_impl.SQLiteUsearchDB.create(db_path=db_path, usearch_cfg=sqlite_usearch_impl.get_default_usearch_config(embedding_dim=embedding_dim))
+        return sqlite_usearch_impl.SQLiteUSearchDB.create(db_path=db_path, usearch_cfg=sqlite_usearch_impl.get_default_usearch_config(embedding_dim=embedding_dim))
 
 
-def _check_database_settings(db: sqlite_usearch_impl.SQLiteUsearchDB, fmin: int = 0, fmax: int = 15000, audio_speed: float = 1.0):
+def _check_database_settings(db: sqlite_usearch_impl.SQLiteUSearchDB, fmin: int = 0, fmax: int = 15000, audio_speed: float = 1.0):
     from ml_collections import ConfigDict
 
     from birdnet_analyzer.embeddings.core import SETTINGS_KEY

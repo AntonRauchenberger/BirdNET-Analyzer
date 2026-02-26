@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Literal
 import keras
 import numpy as np
 import tensorflow as tf
-from birdnet.acoustic_models.v2_4.pb import AcousticPBDownloaderV2_4
+from birdnet.acoustic.models.v2_4.pb import AcousticPBDownloaderV2_4
 
 from birdnet_analyzer import utils
 from birdnet_analyzer.config import RANDOM_SEED

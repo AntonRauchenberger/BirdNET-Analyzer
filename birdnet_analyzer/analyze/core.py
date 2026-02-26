@@ -9,8 +9,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Collection, Sequence
 
     import pandas as pd
-    from birdnet.acoustic_models.inference.perf_tracker import AcousticProgressStats
-    from birdnet.acoustic_models.inference.prediction.result import AcousticResultBase
+    from birdnet.acoustic.inference.core.perf_tracker import AcousticProgressStats
+    from birdnet.acoustic.inference.core.prediction.prediction_result import AcousticResultBase
     from birdnet.globals import ACOUSTIC_MODEL_VERSIONS, MODEL_LANGUAGES
 
     from birdnet_analyzer.config import ADDITIONAL_COLUMNS, RESULT_TYPES
@@ -456,7 +456,7 @@ def save_as_csv(
     df[["Scientific name", "Common name"]] = df["species_name"].str.split("_", n=1, expand=True)
 
     df.rename(
-        columns={"Begin Path": "File", "Begin Time (s)": "Start (s)", "End Time (s)": "End (s)", "confidence": "Confidence"},
+        columns={"input": "File", "start_time": "Start (s)", "end_time": "End (s)", "confidence": "Confidence"},
         inplace=True,
     )
 

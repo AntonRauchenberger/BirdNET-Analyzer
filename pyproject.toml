@@ -31,7 +31,7 @@ dependencies = [
     "pandas",
     "matplotlib",
     "kagglehub",
-    "birdnet>=0.2.7",
+    "birdnet>=0.2.12",
 ]
 
 [project.optional-dependencies]

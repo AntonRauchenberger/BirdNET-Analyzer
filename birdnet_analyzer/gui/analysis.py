@@ -9,7 +9,7 @@ import gradio as gr
 import birdnet_analyzer.gui.utils as gu
 
 if TYPE_CHECKING:
-    from birdnet.acoustic_models.inference.perf_tracker import AcousticProgressStats
+    from birdnet.acoustic.inference.core.perf_tracker import AcousticProgressStats
     from birdnet.globals import MODEL_LANGUAGES
 
     from birdnet_analyzer.config import ADDITIONAL_COLUMNS, RESULT_TYPES

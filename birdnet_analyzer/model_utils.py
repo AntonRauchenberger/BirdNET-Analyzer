@@ -8,9 +8,9 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     import numpy as np
-    from birdnet.acoustic_models.inference.encoding.result import AcousticFileEncodingResult
-    from birdnet.acoustic_models.inference.perf_tracker import AcousticProgressStats
-    from birdnet.acoustic_models.inference.prediction.result import AcousticFilePredictionResult
+    from birdnet.acoustic.inference.core.encoding.encoding_result import AcousticFileEncodingResult
+    from birdnet.acoustic.inference.core.perf_tracker import AcousticProgressStats
+    from birdnet.acoustic.inference.core.prediction.prediction_result import AcousticFilePredictionResult
     from birdnet.globals import ACOUSTIC_MODEL_VERSIONS, MODEL_LANGUAGES
 
 GLOBAL_PREFETCH_RATIO = 2
@@ -62,7 +62,8 @@ def run_interference(
         progress_callback=callback,
         show_stats="progress",
         n_workers=n_workers,
-        n_feeders=n_producers,
+        n_producers=n_producers,
+        apply_sigmoid=False,
     )
 
 
@@ -95,7 +96,7 @@ def get_embeddings(
         speed=speed,
         progress_callback=callback,
         n_workers=n_workers,
-        n_feeders=n_producers,
+        n_producers=n_producers,
     )
 
 

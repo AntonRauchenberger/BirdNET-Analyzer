@@ -8,7 +8,7 @@ from tqdm import tqdm
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from birdnet.acoustic_models.inference.perf_tracker import AcousticProgressStats
+    from birdnet.acoustic.inference.core.perf_tracker import AcousticProgressStats
     from perch_hoplite.db import sqlite_usearch_impl
 
 DATASET_NAME: str = "birdnet_analyzer_dataset"

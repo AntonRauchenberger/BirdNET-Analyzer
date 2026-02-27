@@ -494,7 +494,13 @@ def embeddings_parser():
         "-i",
         "--input",
         dest="audio_input",
-        help="Path to input file or folder.",
+        help="Path to input file or folder, relative to the audio root.",
+    )
+    parser.add_argument(
+        "-r",
+        "--audio_root",
+        dest="audio_root",
+        help="Path to the root directory of audio files.",
     )
     parser.add_argument("--file_output", help="Saves all embeddings contained in the database in a csv file.")
 
@@ -536,6 +542,11 @@ def search_parser():
         default="center",
         choices=["center", "first", "segments"],
         help="Crop mode for the query sample. Can be 'center', 'first' or 'segments'.",
+    )
+
+    parser.add_argument(
+        "--audio_root",
+        help="Path to the root directory of audio files.",
     )
 
     return parser

@@ -90,9 +90,13 @@ def run_single_file_analysis(
 
     table = predictions.to_dataframe()
     n_rows = table.shape[0]
-    table[[HEADER_SCI_NAME_LBL, HEADER_COMMON_NAME_LBL]] = table[
-        "species_name"
-    ].str.split("_", n=1, expand=True)
+    if n_rows > 0:
+        table[[HEADER_SCI_NAME_LBL, HEADER_COMMON_NAME_LBL]] = table[
+            "species_name"
+        ].str.split("_", n=1, expand=True)
+    else:
+        table[HEADER_SCI_NAME_LBL] = []
+        table[HEADER_COMMON_NAME_LBL] = []
 
     table[" "] = ["▶"] * n_rows
     table.rename(

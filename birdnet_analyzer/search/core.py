@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 def search(
     output: str,
     database: str,
+    audio_root: str,
     queryfile: str,
     *,
     n_results: int = 10,
@@ -65,7 +66,7 @@ def search(
     for r in results:
         window = db.get_window(r.window_id)
         recording = db.get_recording(window.recording_id)
-        file = recording.filename
+        file = os.path.join(audio_root, recording.filename)
         filebasename = os.path.basename(file)
         filebasename = os.path.splitext(filebasename)[0]
         offset = window.offsets[0]

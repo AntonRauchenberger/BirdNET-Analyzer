@@ -196,24 +196,6 @@ def _ensure_recording(db: sqlite_usearch_impl.SQLiteUSearchDB, fpath: str, deplo
     return db.insert_recording(filename=fpath, deployment_id=deployment_id)
 
 
-def _try_consume_embedding(
-    fpath, s_start, s_end, embeddings, db: sqlite_usearch_impl.SQLiteUSearchDB, deployment_id: int | None = None, dataset_name: str = DATASET_NAME
-):
-    if deployment_id is None:
-        deployment_id = _ensure_deployment(db, dataset_name)
-
-    recording_id = _ensure_recording(db, fpath, deployment_id)
-
-    db.insert_window(
-        recording_id=recording_id,
-        offsets=[float(s_start), float(s_end)],
-        embedding=embeddings,
-        handle_duplicates="skip",
-    )
-
-    return True
-
-
 def _get_or_create_database(db_path: str, embedding_dim: int = 1024):
     """Get the database object. Creates or opens the databse.
     Args:

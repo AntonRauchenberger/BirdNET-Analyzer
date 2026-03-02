@@ -9,7 +9,8 @@ from tqdm import tqdm
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from birdnet.acoustic.inference.core.perf_tracker import AcousticProgressStats
+    # from birdnet.acoustic.inference.core.perf_tracker import AcousticProgressStats # 0.2.13
+    from birdnet.acoustic_models.inference.perf_tracker import AcousticProgressStats
     from perch_hoplite.db import sqlite_usearch_impl
 
 DATASET_NAME: str = "birdnet_analyzer_dataset"
@@ -179,9 +180,7 @@ def _ensure_deployment(db: sqlite_usearch_impl.SQLiteUSearchDB, dataset_name: st
     """Ensure the BirdNET deployment exists and return its id."""
     from ml_collections import config_dict
 
-    deployments = db.get_all_deployments(
-        config_dict.create(eq=dict(name="birdnet_default", project=dataset_name))
-    )
+    deployments = db.get_all_deployments(config_dict.create(eq=dict(name="birdnet_default", project=dataset_name)))
     if deployments:
         return deployments[0].id
     return db.insert_deployment(name="birdnet_default", project=dataset_name)
@@ -191,15 +190,15 @@ def _ensure_recording(db: sqlite_usearch_impl.SQLiteUSearchDB, fpath: str, deplo
     """Ensure the recording exists and return its id."""
     from ml_collections import config_dict
 
-    recordings = db.get_all_recordings(
-        config_dict.create(eq=dict(filename=fpath, deployment_id=deployment_id))
-    )
+    recordings = db.get_all_recordings(config_dict.create(eq=dict(filename=fpath, deployment_id=deployment_id)))
     if recordings:
         return recordings[0].id
     return db.insert_recording(filename=fpath, deployment_id=deployment_id)
 
 
-def _try_consume_embedding(fpath, s_start, s_end, embeddings, db: sqlite_usearch_impl.SQLiteUSearchDB, deployment_id: int | None = None, dataset_name: str = DATASET_NAME):
+def _try_consume_embedding(
+    fpath, s_start, s_end, embeddings, db: sqlite_usearch_impl.SQLiteUSearchDB, deployment_id: int | None = None, dataset_name: str = DATASET_NAME
+):
     if deployment_id is None:
         deployment_id = _ensure_deployment(db, dataset_name)
 

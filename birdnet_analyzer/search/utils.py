@@ -26,7 +26,7 @@ def _search_ann_ip(db: SQLiteUSearchDB, query_embedding: np.ndarray, n_results: 
     matches = db.ui.search(query_embedding, count=n_results)
     return [
         SearchResult(window_id=int(window_id), sort_score=float(score))
-        for window_id, score in zip(matches.keys, matches.distances)
+        for window_id, score in zip(matches.keys, matches.distances, strict=False)
     ]
 
 

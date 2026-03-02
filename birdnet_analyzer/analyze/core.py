@@ -183,7 +183,7 @@ def analyze(
 
     if save_params:
         save_params_to_file(
-            output / cfg.ANALYSIS_PARAMS_FILENAME,
+            Path(output) / cfg.ANALYSIS_PARAMS_FILENAME,
             (
                 "Segment length",
                 "Sample rate",

@@ -180,7 +180,7 @@ def _ensure_deployment(db: sqlite_usearch_impl.SQLiteUSearchDB, dataset_name: st
     """Ensure the BirdNET deployment exists and return its id."""
     from ml_collections import config_dict
 
-    deployments = db.get_all_deployments(config_dict.create(eq=dict(name="birdnet_default", project=dataset_name)))
+    deployments = db.get_all_deployments(config_dict.create(eq={"name": "birdnet_default", "project": dataset_name}))
     if deployments:
         return deployments[0].id
     return db.insert_deployment(name="birdnet_default", project=dataset_name)
@@ -190,7 +190,7 @@ def _ensure_recording(db: sqlite_usearch_impl.SQLiteUSearchDB, fpath: str, deplo
     """Ensure the recording exists and return its id."""
     from ml_collections import config_dict
 
-    recordings = db.get_all_recordings(config_dict.create(eq=dict(filename=fpath, deployment_id=deployment_id)))
+    recordings = db.get_all_recordings(config_dict.create(eq={"filename": fpath, "deployment_id": deployment_id}))
     if recordings:
         return recordings[0].id
     return db.insert_recording(filename=fpath, deployment_id=deployment_id)

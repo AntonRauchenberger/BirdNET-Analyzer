@@ -101,7 +101,8 @@ def get_embeddings(
         speed=speed,
         progress_callback=callback,
         n_workers=n_workers,
-        n_producers=n_producers,
+        # n_producers=n_producers, # 0.2.13
+        n_feeders=n_producers,
     )
 
 
@@ -132,7 +133,8 @@ def get_embeddings_array(
         speed=speed,
         progress_callback=callback,
         n_workers=n_workers,
-        n_producers=n_producers,
+        # n_producers=n_producers, # 0.2.13
+        n_feeders=n_producers,  # 0.2.13
     ) as session:
         result = session.run_arrays(inputs)
 

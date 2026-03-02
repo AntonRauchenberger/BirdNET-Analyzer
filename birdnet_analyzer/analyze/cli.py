@@ -23,10 +23,16 @@ def main():
     if args.additional_columns and "csv" not in args.rtype:
         import warnings
 
-        warnings.warn("The --additional_columns argument is only valid for CSV output. It will be ignored.", stacklevel=1)
+        warnings.warn(
+            "The --additional_columns argument is only valid for CSV output."
+            "It will be ignored.",
+            stacklevel=1,
+        )
 
     if args.use_perch and args.classifier:
-        raise ValueError("The --use_perch and --classifier arguments cannot be used together.")
+        raise ValueError(
+            "The --use_perch and --classifier arguments cannot be used together."
+        )
 
     analyze_args = vars(args)
     analyze_args.pop("use_perch")  # handled via model param

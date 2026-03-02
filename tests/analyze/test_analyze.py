@@ -42,7 +42,9 @@ def test_analyze_with_real_custom_classifier(setup_test_environment):
 
     analyze(soundscape_path, env["output_dir"], classifier=classifier)
 
-    output_file = os.path.join(env["output_dir"], "soundscape.BirdNET.selection.table.txt")
+    output_file = os.path.join(
+        env["output_dir"], "soundscape.BirdNET.selection.table.txt"
+    )
     assert os.path.exists(output_file), "Output file was not created"
 
     with open(labels) as f:
@@ -51,7 +53,9 @@ def test_analyze_with_real_custom_classifier(setup_test_environment):
     with open(output_file) as f:
         reader = csv.DictReader(f, delimiter="\t")
         for row in reader:
-            assert row["Common Name"] in labels, f"Unexpected label found: {row['Common Name']}"
+            assert row["Common Name"] in labels, (
+                f"Unexpected label found: {row['Common Name']}"
+            )
 
 
 def test_analyze_with_real_custom_classifier_and_species_list(setup_test_environment):
@@ -65,22 +69,32 @@ def test_analyze_with_real_custom_classifier_and_species_list(setup_test_environ
     classifier = "tests/data/analyze/CustomClassifier.tflite"
     species_list = "tests/data/analyze/species_list.txt"
 
-    analyze(soundscape_path, env["output_dir"], classifier=classifier, slist=species_list)
+    analyze(
+        soundscape_path, env["output_dir"], classifier=classifier, slist=species_list
+    )
 
-    output_file = os.path.join(env["output_dir"], "soundscape.BirdNET.selection.table.txt")
+    output_file = os.path.join(
+        env["output_dir"], "soundscape.BirdNET.selection.table.txt"
+    )
     assert os.path.exists(output_file), "Output file was not created"
 
     with open(species_list) as f:
-        valid_species = {line.strip().split("_", 1)[1] for line in f.read().splitlines()}
+        valid_species = {
+            line.strip().split("_", 1)[1] for line in f.read().splitlines()
+        }
 
     with open(output_file) as f:
         reader = csv.DictReader(f, delimiter="\t")
         for row in reader:
-            assert row["Common Name"] in valid_species, f"Label not in species list: {row['Common Name']}"
+            assert row["Common Name"] in valid_species, (
+                f"Label not in species list: {row['Common Name']}"
+            )
 
 
 @pytest.mark.skip(reason="currently not stable anymore")
-@pytest.mark.skipif(platform.system() == "Darwin", reason="Don't ask me why it times out on macOS.")
+@pytest.mark.skipif(
+    platform.system() == "Darwin", reason="Don't ask me why it times out on macOS."
+)
 @pytest.mark.parametrize(
     ("audio_speed", "overlap"),
     [
@@ -92,7 +106,9 @@ def test_analyze_with_real_custom_classifier_and_species_list(setup_test_environ
         (0.3, 0.7),
     ],
 )
-def test_analyze_with_speed_up_and_overlap(setup_test_environment, audio_speed, overlap):
+def test_analyze_with_speed_up_and_overlap(
+    setup_test_environment, audio_speed, overlap
+):
     """Test analyzing with speed up."""
     env = setup_test_environment
 
@@ -103,9 +119,17 @@ def test_analyze_with_speed_up_and_overlap(setup_test_environment, audio_speed, 
     precision = 100
     seq_length = cfg.BIRDNET_SIG_LENGTH
     step_size = round((seq_length - overlap) * audio_speed, precision // 10)
-    expected_start_timestamps = [e / precision for e in range(0, int(file_length * precision), int(step_size * precision))]
+    expected_start_timestamps = [
+        e / precision
+        for e in range(0, int(file_length * precision), int(step_size * precision))
+    ]
     expected_end_timestamps = [
-        e / precision for e in range(round(seq_length * audio_speed * precision), int(file_length * precision) + 1, int(step_size * precision))
+        e / precision
+        for e in range(
+            round(seq_length * audio_speed * precision),
+            int(file_length * precision) + 1,
+            int(step_size * precision),
+        )
     ]
 
     while len(expected_end_timestamps) < len(expected_start_timestamps):
@@ -114,7 +138,14 @@ def test_analyze_with_speed_up_and_overlap(setup_test_environment, audio_speed, 
         else:
             expected_start_timestamps.pop()
 
-    analyze(soundscape_path, env["output_dir"], audio_speed=audio_speed, top_n=1, overlap=overlap, min_conf=0)
+    analyze(
+        soundscape_path,
+        env["output_dir"],
+        audio_speed=audio_speed,
+        top_n=1,
+        overlap=overlap,
+        min_conf=0,
+    )
 
     output_file = os.path.join(env["output_dir"], "BirdNET_SelectionTable.txt")
     assert os.path.exists(output_file)
@@ -122,12 +153,18 @@ def test_analyze_with_speed_up_and_overlap(setup_test_environment, audio_speed, 
     with open(output_file) as f:
         lines = f.readlines()[1:]
 
-        for expected_start, expected_end, line in zip(expected_start_timestamps, expected_end_timestamps, lines, strict=True):
+        for expected_start, expected_end, line in zip(
+            expected_start_timestamps, expected_end_timestamps, lines, strict=True
+        ):
             parts = line.strip().split("\t")
             actual_start = float(parts[1])
             actual_end = float(parts[2])
-            assert float(actual_start) == expected_start, "Start time does not match expected value"
-            assert float(actual_end) == expected_end, "End time does not match expected value"
+            assert float(actual_start) == expected_start, (
+                "Start time does not match expected value"
+            )
+            assert float(actual_end) == expected_end, (
+                "End time does not match expected value"
+            )
 
 
 def test_analyze_with_additional_columns(setup_test_environment):
@@ -143,7 +180,16 @@ def test_analyze_with_additional_columns(setup_test_environment):
         env["output_dir"],
         top_n=1,
         min_conf=0,
-        additional_columns=["lat", "lon", "week", "model", "overlap", "sensitivity", "species_list", "min_conf"],
+        additional_columns=[
+            "lat",
+            "lon",
+            "week",
+            "model",
+            "overlap",
+            "sensitivity",
+            "species_list",
+            "min_conf",
+        ],
         lat=42.5,
         lon=-76.45,
         week=20,
@@ -168,13 +214,25 @@ def test_analyze_with_additional_columns(setup_test_environment):
         assert "min_conf" in headers, "Min confidence column not found in output"
 
         for row in reader:
-            assert float(row["lat"]) == 42.5, "Latitude value does not match expected value"
-            assert float(row["lon"]) == -76.45, "Longitude value does not match expected value"
+            assert float(row["lat"]) == 42.5, (
+                "Latitude value does not match expected value"
+            )
+            assert float(row["lon"]) == -76.45, (
+                "Longitude value does not match expected value"
+            )
             assert int(row["week"]) == 20, "Week value does not match expected value"
-            assert float(row["overlap"]) == 0, "Overlap value does not match expected value"
-            assert float(row["sensitivity"]) == 1.0, "Sensitivity value does not match expected value"
-            assert row["species_list"] == "", "Species list value does not match expected value"
-            assert float(row["min_conf"]) == 0, "Min confidence value does not match expected value"
+            assert float(row["overlap"]) == 0, (
+                "Overlap value does not match expected value"
+            )
+            assert float(row["sensitivity"]) == 1.0, (
+                "Sensitivity value does not match expected value"
+            )
+            assert row["species_list"] == "", (
+                "Species list value does not match expected value"
+            )
+            assert float(row["min_conf"]) == 0, (
+                "Min confidence value does not match expected value"
+            )
 
 
 def test_sensitivity(setup_test_environment):
@@ -218,7 +276,17 @@ def test_sensitivity(setup_test_environment):
     extract_confidence_from_output(output_file, high_sensitivity_result)
 
     for key in normal_sensitivity_result:
-        assert key in low_sensitivity_result, "Low sensitivity result missing key from normal sensitivity result"
-        assert key in high_sensitivity_result, "High sensitivity result missing key from normal sensitivity result"
-        assert low_sensitivity_result[key] <= normal_sensitivity_result[key], "Low sensitivity confidence should be less than or equal to normal sensitivity"
-        assert high_sensitivity_result[key] >= normal_sensitivity_result[key], "High sensitivity confidence should be greater than or equal to normal sensitivity"
+        assert key in low_sensitivity_result, (
+            "Low sensitivity result missing key from normal sensitivity result"
+        )
+        assert key in high_sensitivity_result, (
+            "High sensitivity result missing key from normal sensitivity result"
+        )
+        assert low_sensitivity_result[key] <= normal_sensitivity_result[key], (
+            "Low sensitivity confidence should be less than or equal to normal "
+            "sensitivity"
+        )
+        assert high_sensitivity_result[key] >= normal_sensitivity_result[key], (
+            "High sensitivity confidence should be greater than or equal to normal "
+            "sensitivity"
+        )

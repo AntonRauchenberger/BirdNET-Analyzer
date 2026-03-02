@@ -17,7 +17,8 @@ def select_subdirectories(state_key=None):
     """Creates a directory selection dialog.
 
     Returns:
-        A tuples of (directory, list of subdirectories) or (None, None) if the dialog was canceled.
+        A tuples of (directory, list of subdirectories) or (None, None) if the dialog
+        was canceled.
     """
     dir_name = gu.select_folder(state_key=state_key)
 
@@ -94,7 +95,8 @@ def start_training(
         focal_loss: Whether to use focal loss for training.
         focal_loss_gamma: Gamma parameter for focal loss.
         focal_loss_alpha: Alpha parameter for focal loss.
-        hidden_units: Number of hidden units in the droput: Dropout rate for regularization.
+        hidden_units: Number of hidden units in the droput: Dropout rate for
+            regularization.
         dropout: Dropout rate for regularization.
         label_smoothing: Whether to apply label smoothing for training.
         use_mixup: Whether to use mixup data augmentation.
@@ -116,7 +118,9 @@ def start_training(
     if cache_mode != "load":
         gu.validate(data_dir, loc.localize("validation-no-training-data-selected"))
 
-    gu.validate(output_dir, loc.localize("validation-no-directory-for-classifier-selected"))
+    gu.validate(
+        output_dir, loc.localize("validation-no-directory-for-classifier-selected")
+    )
     gu.validate(classifier_name, loc.localize("validation-no-valid-classifier-name"))
 
     if not epochs or epochs < 0:
@@ -135,7 +139,9 @@ def start_training(
         hidden_units = 0
 
     if progress is not None:
-        progress((0, epochs), desc=loc.localize("progress-build-classifier"), unit="epochs")
+        progress(
+            (0, epochs), desc=loc.localize("progress-build-classifier"), unit="epochs"
+        )
 
     if cache_mode == "load" and not os.path.isfile(cache_file):
         raise gr.Error(loc.localize("validation-no-cache-file-selected"))
@@ -159,11 +165,21 @@ def start_training(
                     desc=f"{loc.localize('progress-saving')} {cc_output_path}",
                 )
             else:
-                progress((epoch + 1, epochs), total=epochs, unit="epochs", desc=loc.localize("progress-training"))
+                progress(
+                    (epoch + 1, epochs),
+                    total=epochs,
+                    unit="epochs",
+                    desc=loc.localize("progress-training"),
+                )
 
     def trial_progression(trial):
         if progress is not None:
-            progress((trial, autotune_trials), total=autotune_trials, unit="trials", desc=loc.localize("progress-autotune"))
+            progress(
+                (trial, autotune_trials),
+                total=autotune_trials,
+                unit="trials",
+                desc=loc.localize("progress-autotune"),
+            )
 
     try:
         history, metrics = train_model(
@@ -186,14 +202,18 @@ def start_training(
             fmin=max(0, min(15000, int(fmin))),
             fmax=max(0, min(15000, int(fmax))),
             model_save_mode=model_save_mode,
-            save_cache_to=os.path.join(cache_file, cache_file_name) if cache_mode == "save" else None,
+            save_cache_to=os.path.join(cache_file, cache_file_name)
+            if cache_mode == "save"
+            else None,
             dropout=max(0.0, min(1.0, float(dropout))),
             overlap=max(0.0, min(2.9, float(crop_overlap))),
             threads=max(1, multiprocessing.cpu_count()),
             on_epoch_end=epoch_progression,
             on_trial_result=trial_progression,
             on_data_load_end=data_load_progression,
-            audio_speed=max(0.1, 1.0 / (audio_speed * -1)) if audio_speed < 0 else max(1.0, float(audio_speed)),
+            audio_speed=max(0.1, 1.0 / (audio_speed * -1))
+            if audio_speed < 0
+            else max(1.0, float(audio_speed)),
             autotune=autotune,
             autotune_trials=autotune_trials,
             autotune_executions_per_trial=int(autotune_executions_per_trials),
@@ -230,9 +250,15 @@ def build_train_tab():
 
         with gr.Row():
             with gr.Column():
-                select_directory_btn = gr.Button(loc.localize("training-tab-input-selection-button-label"))
+                select_directory_btn = gr.Button(
+                    loc.localize("training-tab-input-selection-button-label")
+                )
                 directory_input = gr.List(
-                    headers=[loc.localize("training-tab-classes-dataframe-column-classes-header")],
+                    headers=[
+                        loc.localize(
+                            "training-tab-classes-dataframe-column-classes-header"
+                        )
+                    ],
                     interactive=False,
                     max_height=_GRID_MAX_HEIGHT,
                 )
@@ -242,9 +268,15 @@ def build_train_tab():
                     show_progress="hidden",
                 )
 
-                select_test_directory_btn = gr.Button(loc.localize("training-tab-test-data-selection-button-label"))
+                select_test_directory_btn = gr.Button(
+                    loc.localize("training-tab-test-data-selection-button-label")
+                )
                 test_directory_input = gr.List(
-                    headers=[loc.localize("training-tab-classes-dataframe-column-classes-header")],
+                    headers=[
+                        loc.localize(
+                            "training-tab-classes-dataframe-column-classes-header"
+                        )
+                    ],
                     interactive=False,
                     max_height=_GRID_MAX_HEIGHT,
                 )
@@ -255,7 +287,9 @@ def build_train_tab():
                 )
 
             with gr.Column():
-                select_classifier_directory_btn = gr.Button(loc.localize("training-tab-select-output-button-label"))
+                select_classifier_directory_btn = gr.Button(
+                    loc.localize("training-tab-select-output-button-label")
+                )
 
                 with gr.Column():
                     classifier_name = gr.Textbox(
@@ -264,7 +298,11 @@ def build_train_tab():
                         info=loc.localize("training-tab-classifier-textbox-info"),
                     )
                     output_format = gr.Radio(
-                        ["tflite", "raven", (loc.localize("training-tab-output-format-both"), "both")],
+                        [
+                            "tflite",
+                            "raven",
+                            (loc.localize("training-tab-output-format-both"), "both"),
+                        ],
                         value="tflite",
                         label=loc.localize("training-tab-output-format-radio-label"),
                         info=loc.localize("training-tab-output-format-radio-info"),
@@ -302,7 +340,9 @@ def build_train_tab():
                 info=loc.localize("training-tab-cache-mode-radio-info"),
             )
             with gr.Column(visible=False) as new_cache_file_row:
-                select_cache_file_directory_btn = gr.Button(loc.localize("training-tab-cache-select-directory-button-label"))
+                select_cache_file_directory_btn = gr.Button(
+                    loc.localize("training-tab-cache-select-directory-button-label")
+                )
 
                 with gr.Column():
                     cache_file_name = gr.Textbox(
@@ -312,7 +352,9 @@ def build_train_tab():
                     )
 
                 def select_directory_and_update():
-                    dir_name = gu.select_folder(state_key="train-data-cache-file-output")
+                    dir_name = gu.select_folder(
+                        state_key="train-data-cache-file-output"
+                    )
 
                     if dir_name:
                         return (
@@ -329,11 +371,17 @@ def build_train_tab():
                 )
 
             with gr.Column(visible=False) as load_cache_file_row:
-                selected_cache_file_btn = gr.Button(loc.localize("training-tab-cache-select-file-button-label"))
-                cache_file_input = gr.File(file_types=[".npz"], visible=False, interactive=False)
+                selected_cache_file_btn = gr.Button(
+                    loc.localize("training-tab-cache-select-file-button-label")
+                )
+                cache_file_input = gr.File(
+                    file_types=[".npz"], visible=False, interactive=False
+                )
 
                 def on_cache_file_selection_click():
-                    file = gu.select_file(("NPZ file (*.npz)",), state_key="train_data_cache_file")
+                    file = gu.select_file(
+                        ("NPZ file (*.npz)",), state_key="train_data_cache_file"
+                    )
 
                     if file:
                         return file, gr.File(value=file, visible=True)
@@ -389,10 +437,22 @@ def build_train_tab():
         with gr.Row():
             crop_mode = gr.Radio(
                 [
-                    (loc.localize("training-tab-crop-mode-radio-option-center"), "center"),
-                    (loc.localize("training-tab-crop-mode-radio-option-first"), "first"),
-                    (loc.localize("training-tab-crop-mode-radio-option-segments"), "segments"),
-                    (loc.localize("training-tab-crop-mode-radio-option-smart"), "smart"),
+                    (
+                        loc.localize("training-tab-crop-mode-radio-option-center"),
+                        "center",
+                    ),
+                    (
+                        loc.localize("training-tab-crop-mode-radio-option-first"),
+                        "first",
+                    ),
+                    (
+                        loc.localize("training-tab-crop-mode-radio-option-segments"),
+                        "segments",
+                    ),
+                    (
+                        loc.localize("training-tab-crop-mode-radio-option-smart"),
+                        "smart",
+                    ),
                 ],
                 value="center",
                 label=loc.localize("training-tab-crop-mode-radio-label"),
@@ -411,7 +471,10 @@ def build_train_tab():
 
             def on_crop_select(new_crop_mode):
                 # Make overlap slider visible for both "segments" and "smart" crop modes
-                return gr.Number(visible=new_crop_mode in ["segments", "smart"], interactive=new_crop_mode in ["segments", "smart"])
+                return gr.Number(
+                    visible=new_crop_mode in ["segments", "smart"],
+                    interactive=new_crop_mode in ["segments", "smart"],
+                )
 
             crop_mode.change(on_crop_select, inputs=crop_mode, outputs=crop_overlap)
 
@@ -496,7 +559,9 @@ def build_train_tab():
                 )
                 use_label_smoothing = gr.Checkbox(
                     False,
-                    label=loc.localize("training-tab-use-labelsmoothing-checkbox-label"),
+                    label=loc.localize(
+                        "training-tab-use-labelsmoothing-checkbox-label"
+                    ),
                     info=loc.localize("training-tab-use-labelsmoothing-checkbox-info"),
                     show_label=True,
                 )
@@ -504,9 +569,18 @@ def build_train_tab():
             with gr.Row():
                 upsampling_mode = gr.Radio(
                     [
-                        (loc.localize("training-tab-upsampling-radio-option-repeat"), "repeat"),
-                        (loc.localize("training-tab-upsampling-radio-option-mean"), "mean"),
-                        (loc.localize("training-tab-upsampling-radio-option-linear"), "linear"),
+                        (
+                            loc.localize("training-tab-upsampling-radio-option-repeat"),
+                            "repeat",
+                        ),
+                        (
+                            loc.localize("training-tab-upsampling-radio-option-mean"),
+                            "mean",
+                        ),
+                        (
+                            loc.localize("training-tab-upsampling-radio-option-linear"),
+                            "linear",
+                        ),
                         ("SMOTE", "smote"),
                     ],
                     value="repeat",
@@ -559,7 +633,12 @@ def build_train_tab():
         def on_focal_loss_change(value):
             return gr.Row(visible=value)
 
-        use_focal_loss.change(on_focal_loss_change, inputs=use_focal_loss, outputs=focal_loss_params, show_progress="hidden")
+        use_focal_loss.change(
+            on_focal_loss_change,
+            inputs=use_focal_loss,
+            outputs=focal_loss_params,
+            show_progress="hidden",
+        )
 
         def on_autotune_change(value):
             return (
@@ -577,8 +656,14 @@ def build_train_tab():
 
         model_save_mode = gr.Radio(
             [
-                (loc.localize("training-tab-model-save-mode-radio-option-replace"), "replace"),
-                (loc.localize("training-tab-model-save-mode-radio-option-append"), "append"),
+                (
+                    loc.localize("training-tab-model-save-mode-radio-option-replace"),
+                    "replace",
+                ),
+                (
+                    loc.localize("training-tab-model-save-mode-radio-option-append"),
+                    "append",
+                ),
             ],
             value="replace",
             label=loc.localize("training-tab-model-save-mode-radio-label"),
@@ -587,11 +672,22 @@ def build_train_tab():
 
         train_history_plot = gr.Plot(show_label=False)
         metrics_table = gr.Dataframe(
-            headers=["Class", "Precision", "Recall", "F1 Score", "AUPRC", "AUROC", "Samples"],
+            headers=[
+                "Class",
+                "Precision",
+                "Recall",
+                "F1 Score",
+                "AUPRC",
+                "AUROC",
+                "Samples",
+            ],
             visible=False,
             label="Model Performance Metrics (Default Threshold 0.5)",
         )
-        start_training_button = gr.Button(loc.localize("training-tab-start-training-button-label"), variant="huggingface")
+        start_training_button = gr.Button(
+            loc.localize("training-tab-start-training-button-label"),
+            variant="huggingface",
+        )
 
         def train_and_show_metrics(*args):
             history, metrics = start_training(*args)
@@ -613,7 +709,9 @@ def build_train_tab():
 
                 # Add class-specific metrics
                 for class_name, class_metrics in metrics["class_metrics"].items():
-                    distribution = metrics["class_distribution"].get(class_name, {"count": 0, "percentage": 0.0})
+                    distribution = metrics["class_distribution"].get(
+                        class_name, {"count": 0, "percentage": 0.0}
+                    )
                     table_data.append(
                         [
                             class_name,
@@ -622,7 +720,8 @@ def build_train_tab():
                             f"{class_metrics['f1_default']:.4f}",
                             f"{class_metrics['auprc']:.4f}",
                             f"{class_metrics['auroc']:.4f}",
-                            f"{distribution['count']} ({distribution['percentage']:.2f}%)",
+                            f"{distribution['count']}"
+                            + f"({distribution['percentage']:.2f}%)",
                         ]
                     )
 

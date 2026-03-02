@@ -44,7 +44,8 @@ def _get_header_mapping(line: str) -> dict:
         line (str): A string representing the header line of a file.
 
     Returns:
-        dict: A dictionary where the keys are column names and the values are their respective indices.
+        dict: A dictionary where the keys are column names and the values are their
+              respective indices.
     """
     rtype = _detect_rtypee(line)
 
@@ -55,7 +56,9 @@ def _get_header_mapping(line: str) -> dict:
     return {col: i for i, col in enumerate(cols)}
 
 
-def parse_folders(apath: str, rpath: str, allowed_result_filetypes: tuple[str, ...] = ("txt", "csv")) -> list[dict]:
+def parse_folders(
+    apath: str, rpath: str, allowed_result_filetypes: tuple[str, ...] = ("txt", "csv")
+) -> list[dict]:
     """Read audio and result files.
 
     Reads all audio files and BirdNET output inside directory recursively.
@@ -84,14 +87,21 @@ def parse_folders(apath: str, rpath: str, allowed_result_filetypes: tuple[str, .
     else:
         for root, _, files in os.walk(apath):
             for f in files:
-                if f.rsplit(".", 1)[-1].lower() in cfg.ALLOWED_FILETYPES and not f.startswith("."):
+                if f.rsplit(".", 1)[
+                    -1
+                ].lower() in cfg.ALLOWED_FILETYPES and not f.startswith("."):
                     table_key = os.path.join(root.strip(apath), f.rsplit(".", 1)[0])
                     data[table_key] = {"audio": os.path.join(root, f), "result": ""}
 
         for root, _, files in os.walk(rpath):
             for f in files:
-                if f.rsplit(".", 1)[-1] in allowed_result_filetypes and ".BirdNET." in f:
-                    table_key = os.path.join(root.strip(rpath), f.split(".BirdNET.", 1)[0])
+                if (
+                    f.rsplit(".", 1)[-1] in allowed_result_filetypes
+                    and ".BirdNET." in f
+                ):
+                    table_key = os.path.join(
+                        root.strip(rpath), f.split(".BirdNET.", 1)[0]
+                    )
                     if table_key in data:
                         data[table_key]["result"] = os.path.join(root, f)
 
@@ -102,22 +112,36 @@ def parse_folders(apath: str, rpath: str, allowed_result_filetypes: tuple[str, .
     return flist
 
 
-def parse_files(flist: list[dict], max_segments=100, collection_mode="random", n_bins=10, min_conf=0.25, max_conf=1.0) -> list[tuple[str, list]]:
+def parse_files(
+    flist: list[dict],
+    max_segments=100,
+    collection_mode="random",
+    n_bins=10,
+    min_conf=0.25,
+    max_conf=1.0,
+) -> list[tuple[str, list]]:
     """
     Parses a list of files to extract and organize bird call segments by species.
 
     Args:
-        flist (list[dict]): A list of dictionaries, each containing 'audio' and 'result' file paths.
-                            Optionally, a dictionary can have 'isCombinedFile' set to True to indicate
-                            that it is a combined result file.
-        max_segments (int, optional): The maximum number of segments to retain per species. Defaults to 100.
-        collection_mode (str, optional): The mode to collect segments. Can be "random", "confidence", or "balanced". Defaults to "random".
-        n_bins (int, optional): Number of bins to use when collection_mode is "balanced". Defaults to 10.
-        min_conf (float, optional): Minimum confidence threshold for segments to be considered. Defaults to 0.25.
-        max_conf (float, optional): Maximum confidence threshold for segments to be considered. Defaults to 1.0.
-                     associated with that audio file.
+        flist (list[dict]): A list of dictionaries, each containing 'audio' and 'result'
+                            file paths. Optionally, a dictionary can have
+                            'isCombinedFile' set to True to indicate that it is a
+                            combined result file.
+        max_segments (int, optional): The maximum number of segments to retain per
+                                      species. Defaults to 100.
+        collection_mode (str, optional): The mode to collect segments.
+            Can be "random", "confidence", or "balanced". Defaults to "random".
+        n_bins (int, optional): Number of bins to use when collection_mode is
+            "balanced". Defaults to 10.
+        min_conf (float, optional): Minimum confidence threshold for segments to be
+            considered. Defaults to 0.25.
+        max_conf (float, optional): Maximum confidence threshold for segments to be
+            considered. Defaults to 1.0.
+
     Raises:
-        KeyError: If the dictionaries in flist do not contain the required keys ('audio' and 'result').
+        KeyError: If the dictionaries in flist do not contain the required keys
+        ('audio' and 'result').
     Example:
         flist = [
             {"audio": "path/to/audio1.wav", "result": "path/to/result1.csv"},
@@ -204,7 +228,9 @@ def parse_files(flist: list[dict], max_segments=100, collection_mode="random", n
     return [tuple(e) for e in segments.items()]
 
 
-def _find_segments_from_combined(rfile: str, min_conf: float = 0.25, max_conf: float = 1.0) -> list[dict]:
+def _find_segments_from_combined(
+    rfile: str, min_conf: float = 0.25, max_conf: float = 1.0
+) -> list[dict]:
     """Extracts the segments from a combined results file
 
     Args:
@@ -212,7 +238,13 @@ def _find_segments_from_combined(rfile: str, min_conf: float = 0.25, max_conf: f
 
     Returns:
         list[dict]: A list of dicts in the form of
-        {"audio": afile, "start": start, "end": end, "species": species, "confidence": confidence}
+        {
+            "audio": afile,
+            "start": start,
+            "end": end,
+            "species": species,
+            "confidence": confidence
+        }
     """
     segments: list[dict] = []
 
@@ -239,10 +271,17 @@ def _find_segments_from_combined(rfile: str, min_conf: float = 0.25, max_conf: f
             d = line.split("\t")
             file_offset = float(d[header_mapping["File Offset (s)"]])
             start = file_offset
-            end = file_offset + (float(d[header_mapping["End Time (s)"]]) - float(d[header_mapping["Begin Time (s)"]]))
+            end = file_offset + (
+                float(d[header_mapping["End Time (s)"]])
+                - float(d[header_mapping["Begin Time (s)"]])
+            )
             species = d[header_mapping["Common Name"]]
             confidence = float(d[header_mapping["Confidence"]])
-            afile = d[header_mapping["Begin Path"]].replace("/", os.sep).replace("\\", os.sep)
+            afile = (
+                d[header_mapping["Begin Path"]]
+                .replace("/", os.sep)
+                .replace("\\", os.sep)
+            )
 
         elif rtype == "kaleidoscope" and i > 0:
             d = line.split(",")
@@ -253,7 +292,11 @@ def _find_segments_from_combined(rfile: str, min_conf: float = 0.25, max_conf: f
             in_dir = d[header_mapping["INDIR"]]
             folder = d[header_mapping["FOLDER"]]
             in_file = d[header_mapping["IN FILE"]]
-            afile = os.path.join(in_dir, folder, in_file).replace("/", os.sep).replace("\\", os.sep)
+            afile = (
+                os.path.join(in_dir, folder, in_file)
+                .replace("/", os.sep)
+                .replace("\\", os.sep)
+            )
 
         elif rtype == "csv" and i > 0:
             d = line.split(",")
@@ -264,13 +307,28 @@ def _find_segments_from_combined(rfile: str, min_conf: float = 0.25, max_conf: f
             afile = d[header_mapping["File"]].replace("/", os.sep).replace("\\", os.sep)
 
         # Check if confidence is high enough and label is not "nocall"
-        if confidence >= min_conf and confidence <= max_conf and species.lower() != "nocall" and afile:
-            segments.append({"audio": afile, "start": start, "end": end, "species": species, "confidence": confidence})
+        if (
+            confidence >= min_conf
+            and confidence <= max_conf
+            and species.lower() != "nocall"
+            and afile
+        ):
+            segments.append(
+                {
+                    "audio": afile,
+                    "start": start,
+                    "end": end,
+                    "species": species,
+                    "confidence": confidence,
+                }
+            )
 
     return segments
 
 
-def _find_segments(afile: str, rfile: str, min_conf: float = 0.25, max_conf: float = 1.0) -> list[dict]:
+def _find_segments(
+    afile: str, rfile: str, min_conf: float = 0.25, max_conf: float = 1.0
+) -> list[dict]:
     """Extracts the segments for an audio file from the results file
 
     Args:
@@ -279,7 +337,13 @@ def _find_segments(afile: str, rfile: str, min_conf: float = 0.25, max_conf: flo
 
     Returns:
         A list of dicts in the form of
-        {"audio": afile, "start": start, "end": end, "species": species, "confidence": confidence}
+        {
+            "audio": afile,
+            "start": start,
+            "end": end,
+            "species": species,
+            "confidence": confidence
+        }
     """
     segments: list[dict] = []
 
@@ -327,26 +391,47 @@ def _find_segments(afile: str, rfile: str, min_conf: float = 0.25, max_conf: flo
             confidence = float(d[header_mapping["Confidence"]])
 
         # Check if confidence is high enough and label is not "nocall"
-        if confidence >= min_conf and confidence <= max_conf and species.lower() != "nocall":
-            segments.append({"audio": afile, "start": start, "end": end, "species": species, "confidence": confidence})
+        if (
+            confidence >= min_conf
+            and confidence <= max_conf
+            and species.lower() != "nocall"
+        ):
+            segments.append(
+                {
+                    "audio": afile,
+                    "start": start,
+                    "end": end,
+                    "species": species,
+                    "confidence": confidence,
+                }
+            )
 
     return segments
 
 
 def extract_segments(
-    file_path: str, output_path: str, seg_length: float, segments: list[dict], sample_rate: int = 48000, audio_speed: float = 1.0
+    file_path: str,
+    output_path: str,
+    seg_length: float,
+    segments: list[dict],
+    sample_rate: int = 48000,
+    audio_speed: float = 1.0,
 ) -> tuple[str, bool]:
     """
-    Extracts audio segments from a given audio file based on provided segment information.
+    Extracts audio segments from a given audio file based on provided segment
+    information.
+
     Args:
         item (tuple): A tuple containing:
             - A tuple with:
                 - A string representing the path to the audio file.
-                - A list of dictionaries, each containing segment information with keys "start", "end", "species", "confidence", and "audio".
+                - A list of dictionaries, each containing segment information with keys
+                "start", "end", "species", "confidence", and "audio".
             - A float representing the segment length.
             - A dictionary containing configuration settings.
     Returns:
-        tuple[str, bool]: A tuple containing the file path and a boolean indicating if segments were successfully extracted.
+        tuple[str, bool]: A tuple containing the file path and a boolean indicating if
+        segments were successfully extracted.
     Raises:
         Exception: If there is an error opening the audio file or extracting segments.
     """

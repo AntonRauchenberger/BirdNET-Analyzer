@@ -8,7 +8,9 @@ from birdnet_analyzer.gui import settings
 
 
 @gu.gui_runtime_error_handler
-def run_species_list(out_path, filename, lat, lon, week, use_yearlong, sf_thresh, sortby):
+def run_species_list(
+    out_path, filename, lat, lon, week, use_yearlong, sf_thresh, sortby
+):
     from birdnet_analyzer.species.utils import run
 
     gu.validate(out_path, loc.localize("validation-no-directory-selected"))
@@ -28,7 +30,9 @@ def run_species_list(out_path, filename, lat, lon, week, use_yearlong, sf_thresh
 def build_species_tab():
     with gr.Tab(loc.localize("species-tab-title")) as species_tab:
         output_directory_state = gr.State()
-        select_directory_btn = gr.Button(loc.localize("species-tab-select-output-directory-button-label"))
+        select_directory_btn = gr.Button(
+            loc.localize("species-tab-select-output-directory-button-label")
+        )
         classifier_name = gr.Textbox(
             "species_list.txt",
             visible=False,
@@ -54,7 +58,14 @@ def build_species_tab():
             show_progress="hidden",
         )
 
-        lat_number, lon_number, week_number, sf_thresh_number, yearlong_checkbox, map_plot = gu.species_list_coordinates(show_map=True)
+        (
+            lat_number,
+            lon_number,
+            week_number,
+            sf_thresh_number,
+            yearlong_checkbox,
+            map_plot,
+        ) = gu.species_list_coordinates(show_map=True)
 
         sortby = gr.Radio(
             [
@@ -66,7 +77,9 @@ def build_species_tab():
             info=loc.localize("species-tab-sort-radio-info"),
         )
 
-        start_btn = gr.Button(loc.localize("species-tab-start-button-label"), variant="huggingface")
+        start_btn = gr.Button(
+            loc.localize("species-tab-start-button-label"), variant="huggingface"
+        )
         start_btn.click(
             run_species_list,
             inputs=[
@@ -81,7 +94,11 @@ def build_species_tab():
             ],
         )
 
-    species_tab.select(lambda lat, lon: gu.plot_map_scatter_mapbox(lat, lon, zoom=3), inputs=[lat_number, lon_number], outputs=map_plot)
+    species_tab.select(
+        lambda lat, lon: gu.plot_map_scatter_mapbox(lat, lon, zoom=3),
+        inputs=[lat_number, lon_number],
+        outputs=map_plot,
+    )
 
     return lat_number, lon_number, map_plot
 

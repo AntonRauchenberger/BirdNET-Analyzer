@@ -7,7 +7,11 @@ import birdnet_analyzer.config as cfg
 import birdnet_analyzer.gui.localization as loc
 import birdnet_analyzer.gui.utils as gu
 from birdnet_analyzer import audio, utils
-from birdnet_analyzer.analyze.core import save_as_csv, save_as_kaleidoscope, save_as_rtable
+from birdnet_analyzer.analyze.core import (
+    save_as_csv,
+    save_as_kaleidoscope,
+    save_as_rtable,
+)
 
 MATPLOTLIB_FIGURE_NUM = "single-file-tab-spectrogram-plot"
 HEADER_START_LBL = loc.localize("single-tab-output-header-start")
@@ -86,7 +90,9 @@ def run_single_file_analysis(
 
     table = predictions.to_dataframe()
     n_rows = table.shape[0]
-    table[[HEADER_SCI_NAME_LBL, HEADER_COMMON_NAME_LBL]] = table["species_name"].str.split("_", n=1, expand=True)
+    table[[HEADER_SCI_NAME_LBL, HEADER_COMMON_NAME_LBL]] = table[
+        "species_name"
+    ].str.split("_", n=1, expand=True)
 
     table[" "] = ["▶"] * n_rows
     table.rename(
@@ -99,22 +105,50 @@ def run_single_file_analysis(
     )
     table[HEADER_START_LBL] = table[HEADER_START_LBL].apply(convert_to_time_str)
     table[HEADER_END_LBL] = table[HEADER_END_LBL].apply(convert_to_time_str)
-    table = table[[" ", HEADER_START_LBL, HEADER_END_LBL, HEADER_SCI_NAME_LBL, HEADER_COMMON_NAME_LBL, HEADER_CONFIDENCE_LBL]]
-    table[HEADER_CONFIDENCE_LBL] = table[HEADER_CONFIDENCE_LBL].apply(lambda x: f"{x:0.3f}")
+    table = table[
+        [
+            " ",
+            HEADER_START_LBL,
+            HEADER_END_LBL,
+            HEADER_SCI_NAME_LBL,
+            HEADER_COMMON_NAME_LBL,
+            HEADER_CONFIDENCE_LBL,
+        ]
+    ]
+    table[HEADER_CONFIDENCE_LBL] = table[HEADER_CONFIDENCE_LBL].apply(
+        lambda x: f"{x:0.3f}"
+    )
 
     return (
         table,
         gr.update(visible=True),
-        {"predictions": predictions, "fmin": fmin, "fmax": fmax, "overlap": overlap, "sensitivity": sensitivity, "lat": lat, "lon": lon, "week": week},
+        {
+            "predictions": predictions,
+            "fmin": fmin,
+            "fmax": fmax,
+            "overlap": overlap,
+            "sensitivity": sensitivity,
+            "lat": lat,
+            "lon": lon,
+            "week": week,
+        },
     )
 
 
 def build_single_analysis_tab():
     with gr.Tab(loc.localize("single-tab-title")):
-        audio_input = gr.Audio(type="filepath", label=loc.localize("single-audio-label"), sources=["upload"])
+        audio_input = gr.Audio(
+            type="filepath",
+            label=loc.localize("single-audio-label"),
+            sources=["upload"],
+        )
 
         with gr.Group():
-            spectogram_output = gr.Plot(label=loc.localize("review-tab-spectrogram-plot-label"), visible=False, show_label=False)
+            spectogram_output = gr.Plot(
+                label=loc.localize("review-tab-spectrogram-plot-label"),
+                visible=False,
+                show_label=False,
+            )
             generate_spectrogram_cb = gr.Checkbox(
                 value=False,
                 label=loc.localize("single-tab-spectrogram-checkbox-label"),
@@ -122,17 +156,36 @@ def build_single_analysis_tab():
             )
         audio_path_state = gr.State()
         last_prediction_state = gr.State()
-        sample_settings, species_settings, model_settings = gu.sample_species_model_settings(opened=False)
+        sample_settings, species_settings, model_settings = (
+            gu.sample_species_model_settings(opened=False)
+        )
         locale_radio = gu.locale()
 
-        single_file_analyze = gr.Button(loc.localize("analyze-start-button-label"), variant="huggingface", interactive=False)
+        single_file_analyze = gr.Button(
+            loc.localize("analyze-start-button-label"),
+            variant="huggingface",
+            interactive=False,
+        )
 
         with gr.Row(visible=False) as action_row:
             with gr.Group(), gr.Column():
-                rtable_download_button = gr.Button(loc.localize("single-tab-download-rtable-button-label"))
-                csv_download_button = gr.Button(loc.localize("single-tab-download-csv-button-label"))
-                kaleidoscope_download_button = gr.Button(loc.localize("single-tab-download-kaleidoscope-button-label"))
-            segment_audio = gr.Audio(autoplay=True, type="numpy", show_download_button=True, show_label=False, editable=False, visible=False)
+                rtable_download_button = gr.Button(
+                    loc.localize("single-tab-download-rtable-button-label")
+                )
+                csv_download_button = gr.Button(
+                    loc.localize("single-tab-download-csv-button-label")
+                )
+                kaleidoscope_download_button = gr.Button(
+                    loc.localize("single-tab-download-kaleidoscope-button-label")
+                )
+            segment_audio = gr.Audio(
+                autoplay=True,
+                type="numpy",
+                show_download_button=True,
+                show_label=False,
+                editable=False,
+                visible=False,
+            )
 
         output_dataframe = gr.Dataframe(
             type="pandas",
@@ -154,22 +207,40 @@ def build_single_analysis_tab():
                     return (
                         i["path"],
                         gr.Audio(label=os.path.basename(i["path"])),
-                        gr.Plot(visible=True, value=utils.spectrogram_from_file(i["path"], fig_size=(20, 4), fig_num=MATPLOTLIB_FIGURE_NUM))
+                        gr.Plot(
+                            visible=True,
+                            value=utils.spectrogram_from_file(
+                                i["path"],
+                                fig_size=(20, 4),
+                                fig_num=MATPLOTLIB_FIGURE_NUM,
+                            ),
+                        )
                         if generate_spectrogram
                         else gr.Plot(visible=False),
                         gr.Button(interactive=True),
                     )
                 except Exception as e:
-                    raise gr.Error(loc.localize("single-tab-generate-spectrogram-error")) from e
+                    raise gr.Error(
+                        loc.localize("single-tab-generate-spectrogram-error")
+                    ) from e
             else:
                 return None, None, gr.Plot(visible=False), gr.update(interactive=False)
 
         def try_generate_spectrogram(audio_path, generate_spectrogram):
             if audio_path and generate_spectrogram:
                 try:
-                    return gr.Plot(visible=True, value=utils.spectrogram_from_file(audio_path["path"], fig_size=(20, 4), fig_num=MATPLOTLIB_FIGURE_NUM))
+                    return gr.Plot(
+                        visible=True,
+                        value=utils.spectrogram_from_file(
+                            audio_path["path"],
+                            fig_size=(20, 4),
+                            fig_num=MATPLOTLIB_FIGURE_NUM,
+                        ),
+                    )
                 except Exception as e:
-                    raise gr.Error(loc.localize("single-tab-generate-spectrogram-error")) from e
+                    raise gr.Error(
+                        loc.localize("single-tab-generate-spectrogram-error")
+                    ) from e
             else:
                 return gr.Plot()
 
@@ -183,7 +254,12 @@ def build_single_analysis_tab():
         audio_input.change(
             get_audio_path,
             inputs=[audio_input, generate_spectrogram_cb],
-            outputs=[audio_path_state, audio_input, spectogram_output, single_file_analyze],
+            outputs=[
+                audio_path_state,
+                audio_input,
+                spectogram_output,
+                single_file_analyze,
+            ],
             preprocess=False,
         )
 
@@ -216,14 +292,19 @@ def build_single_analysis_tab():
                 return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
 
             except ValueError as e:
-                raise ValueError("Input must be in the format hh:mm:ss or hh:mm:ss.ssssss with numeric values.") from e
+                raise ValueError(
+                    "Input must be in the format hh:mm:ss or hh:mm:ss.ssssss "
+                    "with numeric values."
+                ) from e
 
         def get_selected_audio(evt: gr.SelectData, audio_path):
             if evt.index[1] == 0 and evt.row_value[1] and evt.row_value[2]:
                 start = time_to_seconds(evt.row_value[1])
                 end = time_to_seconds(evt.row_value[2])
 
-                data, sr = audio.open_audio_file(audio_path, offset=start, duration=end - start)
+                data, sr = audio.open_audio_file(
+                    audio_path, offset=start, duration=end - start
+                )
 
                 return gr.update(visible=True, value=(sr, data))
 
@@ -276,13 +357,25 @@ def build_single_analysis_tab():
                         Path(file_location),
                     )
 
-        output_dataframe.select(get_selected_audio, inputs=audio_path_state, outputs=segment_audio)
-        single_file_analyze.click(run_single_file_analysis, inputs=inputs, outputs=[output_dataframe, action_row, last_prediction_state])
+        output_dataframe.select(
+            get_selected_audio, inputs=audio_path_state, outputs=segment_audio
+        )
+        single_file_analyze.click(
+            run_single_file_analysis,
+            inputs=inputs,
+            outputs=[output_dataframe, action_row, last_prediction_state],
+        )
         rtable_download_button.click(download_rtable, inputs=last_prediction_state)
         csv_download_button.click(download_csv, inputs=last_prediction_state)
-        kaleidoscope_download_button.click(download_kaleidoscope, inputs=last_prediction_state)
+        kaleidoscope_download_button.click(
+            download_kaleidoscope, inputs=last_prediction_state
+        )
 
-    return species_settings["lat_number"], species_settings["lon_number"], species_settings["map_plot"]
+    return (
+        species_settings["lat_number"],
+        species_settings["lon_number"],
+        species_settings["map_plot"],
+    )
 
 
 if __name__ == "__main__":

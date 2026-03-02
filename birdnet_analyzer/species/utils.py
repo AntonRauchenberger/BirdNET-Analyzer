@@ -15,9 +15,12 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
 
-def get_species_list(lat: float, lon: float, week: int, threshold: float, lang: MODEL_LANGUAGES) -> NDArray[np.str_]:
+def get_species_list(
+    lat: float, lon: float, week: int, threshold: float, lang: MODEL_LANGUAGES
+) -> NDArray[np.str_]:
     """
-    Generates a species list for a given location and time, and saves it to the specified output path.
+    Generates a species list for a given location and time, and saves it to the
+    specified output path.
     Args:
         lat (float): Latitude of the location.
         lon (float): Longitude of the location.
@@ -27,6 +30,8 @@ def get_species_list(lat: float, lon: float, week: int, threshold: float, lang: 
     Returns:
         NDArray[np.str_]: Species list as numpy strings.
     """
-    species_list = model_utils.run_geomodel(lat, lon, week, threshold=threshold, language=lang)
+    species_list = model_utils.run_geomodel(
+        lat, lon, week, threshold=threshold, language=lang
+    )
 
     return species_list.species_list

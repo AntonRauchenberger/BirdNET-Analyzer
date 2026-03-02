@@ -9,9 +9,20 @@ MODEL_VERSION: str = "V2.4"
 SCORE_FUNCTIONS = Literal["cosine", "euclidean", "dot"]
 CROP_MODES = Literal["center", "first", "segments"]
 CODES_FILE: str = os.path.join(SCRIPT_DIR, "eBird_taxonomy_codes_2024E.json")
-ALLOWED_FILETYPES: list[str] = ["wav", "flac", "mp3", "ogg", "m4a", "wma", "aiff", "aif"]
+ALLOWED_FILETYPES: list[str] = [
+    "wav",
+    "flac",
+    "mp3",
+    "ogg",
+    "m4a",
+    "wma",
+    "aiff",
+    "aif",
+]
 RESULT_TYPES = Literal["table", "audacity", "kaleidoscope", "csv"]
-ADDITIONAL_COLUMNS = Literal["lat", "lon", "week", "overlap", "sensitivity", "min_conf", "species_list", "model"]
+ADDITIONAL_COLUMNS = Literal[
+    "lat", "lon", "week", "overlap", "sensitivity", "min_conf", "species_list", "model"
+]
 OUTPUT_RAVEN_FILENAME: str = "BirdNET_SelectionTable.txt"
 OUTPUT_KALEIDOSCOPE_FILENAME: str = "BirdNET_Kaleidoscope.csv"
 OUTPUT_CSV_FILENAME: str = "BirdNET_CombinedTable.csv"

@@ -44,7 +44,18 @@ def batched(iterable, n, *, strict=False):
         yield batch
 
 
-def spectrogram_from_file(path, fig_num=None, fig_size=None, offset=0, duration=None, fmin=None, fmax=None, speed=1.0, sig_fmin=0, sig_fmax=15000):
+def spectrogram_from_file(
+    path,
+    fig_num=None,
+    fig_size=None,
+    offset=0,
+    duration=None,
+    fmin=None,
+    fmax=None,
+    speed=1.0,
+    sig_fmin=0,
+    sig_fmax=15000,
+):
     """
     Generate a spectrogram from an audio file.
 
@@ -56,7 +67,16 @@ def spectrogram_from_file(path, fig_num=None, fig_size=None, offset=0, duration=
     """
     from birdnet_analyzer import audio
 
-    s, sr = audio.open_audio_file(path, offset=offset, duration=duration, fmin=fmin, fmax=fmax, speed=speed, sig_fmin=sig_fmin, sig_fmax=sig_fmax)
+    s, sr = audio.open_audio_file(
+        path,
+        offset=offset,
+        duration=duration,
+        fmin=fmin,
+        fmax=fmax,
+        speed=speed,
+        sig_fmin=sig_fmin,
+        sig_fmax=sig_fmax,
+    )
 
     return spectrogram_from_audio(s, sr, fig_num=fig_num, fig_size=fig_size)
 
@@ -115,7 +135,10 @@ def collect_audio_files(path: str, max_files: int | None = None):
 
     for root, _, flist in os.walk(path):
         for f in flist:
-            if not f.startswith(".") and f.rsplit(".", 1)[-1].lower() in ALLOWED_FILETYPES:
+            if (
+                not f.startswith(".")
+                and f.rsplit(".", 1)[-1].lower() in ALLOWED_FILETYPES
+            ):
                 files.append(os.path.join(root, f))
 
                 if max_files and len(files) >= max_files:
@@ -124,7 +147,9 @@ def collect_audio_files(path: str, max_files: int | None = None):
     return sorted(files)
 
 
-def read_lines(path: str | Path | None, trim: bool = False, fail_on_blank_lines: bool = False) -> list[str]:
+def read_lines(
+    path: str | Path | None, trim: bool = False, fail_on_blank_lines: bool = False
+) -> list[str]:
     """Reads the lines into a list.
 
     Opens the file and reads its contents into a list.
@@ -145,7 +170,9 @@ def read_lines(path: str | Path | None, trim: bool = False, fail_on_blank_lines:
 
     for line in lines:
         if not line and fail_on_blank_lines:
-            raise ValueError(f"Blank lines are not allowed in species list\nFile: {path}")
+            raise ValueError(
+                f"Blank lines are not allowed in species list\nFile: {path}"
+            )
 
         cleaned_lines.append(line.strip() if trim else line)
 
@@ -186,7 +213,12 @@ def write_error_log(ex: Exception):
     import datetime
 
     with open(ERROR_LOG_FILE, "a") as elog:
-        elog.write(datetime.datetime.now().strftime("[%Y-%m-%d %H:%M:%S]") + "\n" + "".join(traceback.TracebackException.from_exception(ex).format()) + "\n")
+        elog.write(
+            datetime.datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+            + "\n"
+            + "".join(traceback.TracebackException.from_exception(ex).format())
+            + "\n"
+        )
 
 
 def load_codes() -> dict[str, str]:

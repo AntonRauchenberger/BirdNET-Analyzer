@@ -84,16 +84,19 @@ def gui_runtime_error_handler(f):
     return wrapper
 
 
-# Nishant - Following two functions (select_folder and get_files_and_durations) are written for Folder selection
+# Nishant - Following two functions (select_folder and get_files_and_durations) are
+# written for Folder selection
 def select_folder(state_key=None):
     """
     Opens a folder selection dialog and returns the selected folder path.
     On Windows, it uses tkinter's filedialog to open the folder selection dialog.
-    On other platforms, it uses webview's FOLDER_DIALOG to open the folder selection dialog.
-    If a state_key is provided, the initial directory for the dialog is retrieved from the state.
-    If a folder is selected and a state_key is provided, the selected folder path is saved to the state.
+    On other platforms, it uses webview's FOLDER_DIALOG to open the folder selection
+    dialog. If a state_key is provided, the initial directory for the dialog is
+    retrieved from the state. If a folder is selected and a state_key is provided, the
+    selected folder path is saved to the state.
     Args:
-        state_key (str, optional): The key to retrieve and save the folder path in the state. Defaults to None.
+        state_key (str, optional): The key to retrieve and save the folder path in the
+        state. Defaults to None.
     Returns:
         str: The path of the selected folder, or None if no folder was selected.
     """
@@ -109,7 +112,9 @@ def select_folder(state_key=None):
         tk.destroy()
     else:
         initial_dir = settings.get_state(state_key, "") if state_key else ""
-        dirname = _WINDOW.create_file_dialog(webview.FileDialog.FOLDER, directory=initial_dir)
+        dirname = _WINDOW.create_file_dialog(
+            webview.FileDialog.FOLDER, directory=initial_dir
+        )
         folder_selected = dirname[0] if dirname else None
 
     if folder_selected and state_key:
@@ -123,9 +128,11 @@ def get_audio_files_and_durations(folder, max_files=None):
     Collects audio files from a specified folder and retrieves their durations.
     Args:
         folder (str): The path to the folder containing audio files.
-        max_files (int, optional): The maximum number of files to collect. If None, all files are collected.
+        max_files (int, optional): The maximum number of files to collect. If None, all
+            files are collected.
     Returns:
-        list: A list of lists, where each inner list contains the relative file path and its duration as a string.
+        list: A list of lists, where each inner list contains the relative file path and
+            its duration as a string.
     """
     import librosa
 
@@ -193,7 +200,8 @@ def select_directory(collect_files=True, max_files=None, state_key=None):
         collect_files: If True, also lists a files inside the directory.
 
     Returns:
-        If collect_files==True, returns (directory path, list of (relative file path, audio length))
+        If collect_files==True, returns
+        (directory path, list of (relative file path, audio length))
         else just the directory path.
         All values will be None of the dialog is cancelled.
     """
@@ -207,17 +215,23 @@ def select_directory(collect_files=True, max_files=None, state_key=None):
 
         files = utils.collect_audio_files(dir_name, max_files=max_files)
 
-        return dir_name, [[os.path.relpath(file, dir_name), format_seconds(librosa.get_duration(filename=file))] for file in files]
+        return dir_name, [
+            [
+                os.path.relpath(file, dir_name),
+                format_seconds(librosa.get_duration(filename=file)),
+            ]
+            for file in files
+        ]
 
     return dir_name or None
 
 
-def build_header():
+def build_header(logo="assets/img/birdnet_logo.png"):
     with gr.Row():
         gr.Markdown(
             f"""
 <div style='display: flex; align-items: center;'>
-    <img src='data:image/png;base64,{utils.img2base64(os.path.join(SCRIPT_DIR, "assets/img/birdnet_logo.png"))}'
+    <img src='data:image/png;base64,{utils.img2base64(os.path.join(SCRIPT_DIR, logo))}'
         style='width: 50px; height: 50px; margin-right: 10px;'>
     <h2>BirdNET Analyzer</h2>
 </div>
@@ -250,7 +264,11 @@ def build_settings():
     with gr.Tab(loc.localize("settings-tab-title")) as settings_tab:
         with gr.Group():
             with gr.Row():
-                options = [lang.rsplit(".", 1)[0] for lang in os.listdir(loc.LANGUAGE_DIR) if lang.endswith(".json")]
+                options = [
+                    lang.rsplit(".", 1)[0]
+                    for lang in os.listdir(loc.LANGUAGE_DIR)
+                    if lang.endswith(".json")
+                ]
                 languages_dropdown = gr.Dropdown(
                     options,
                     value=loc.TARGET_LANGUAGE,
@@ -262,8 +280,14 @@ def build_settings():
             with gr.Row():
                 theme_radio = gr.Radio(
                     [
-                        (loc.localize("settings-tab-theme-dropdown-dark-option"), "dark"),
-                        (loc.localize("settings-tab-theme-dropdown-light-option"), "light"),
+                        (
+                            loc.localize("settings-tab-theme-dropdown-dark-option"),
+                            "dark",
+                        ),
+                        (
+                            loc.localize("settings-tab-theme-dropdown-light-option"),
+                            "light",
+                        ),
                     ],
                     value=lambda: settings.theme(),  # noqa: PLW0108
                     label=loc.localize("settings-tab-theme-dropdown-label"),
@@ -283,7 +307,10 @@ def build_settings():
 
         error_log_tb = gr.TextArea(
             label=loc.localize("settings-tab-error-log-textbox-label"),
-            info=f"{loc.localize('settings-tab-error-log-textbox-info-path')}: {cfg.ERROR_LOG_FILE}",
+            info=(
+                f"{loc.localize('settings-tab-error-log-textbox-info-path')}: "
+                f"{cfg.ERROR_LOG_FILE}"
+            ),
             interactive=False,
             placeholder=loc.localize("settings-tab-error-log-textbox-placeholder"),
             show_copy_button=True,
@@ -309,7 +336,9 @@ def build_settings():
 
             return ""
 
-        languages_dropdown.input(on_language_change, inputs=languages_dropdown, show_progress="hidden")
+        languages_dropdown.input(
+            on_language_change, inputs=languages_dropdown, show_progress="hidden"
+        )
         theme_radio.input(on_theme_change, inputs=theme_radio, show_progress="hidden")
         settings_tab.select(on_tab_select, outputs=error_log_tb, show_progress="hidden")
 
@@ -325,13 +354,22 @@ def sample_species_model_settings(opened=True):
         return (
             gr.update(interactive=not is_perch),
             gr.update(maximum=4.9 if is_perch else 2.9),
-            gr.update(choices=[_CUSTOM_SPECIES, _ALL_SPECIES] if is_perch else [_CUSTOM_SPECIES, _PREDICT_SPECIES, _ALL_SPECIES], value=_ALL_SPECIES),
+            gr.update(
+                choices=[_CUSTOM_SPECIES, _ALL_SPECIES]
+                if is_perch
+                else [_CUSTOM_SPECIES, _PREDICT_SPECIES, _ALL_SPECIES],
+                value=_ALL_SPECIES,
+            ),
         )
 
     model_settings["model_selection_radio"].change(
         on_species_list_change,
         inputs=model_settings["model_selection_radio"],
-        outputs=[sample_settings["sensitivity_slider"], sample_settings["overlap_slider"], species_settings["species_list_radio"]],
+        outputs=[
+            sample_settings["sensitivity_slider"],
+            sample_settings["overlap_slider"],
+            species_settings["species_list_radio"],
+        ],
         show_progress="hidden",
     )
 
@@ -346,7 +384,10 @@ def sample_sliders(opened=True) -> dict[_SAMPLE_KEYS, gr.components.Component]:
     Returns:
         A dict with the created elements.
     """
-    with gr.Group(), gr.Accordion(loc.localize("inference-settings-accordion-label"), open=opened):
+    with (
+        gr.Group(),
+        gr.Accordion(loc.localize("inference-settings-accordion-label"), open=opened),
+    ):
         with gr.Group():
             with gr.Row():
                 use_top_n_checkbox = gr.Checkbox(
@@ -372,7 +413,10 @@ def sample_sliders(opened=True) -> dict[_SAMPLE_KEYS, gr.components.Component]:
                 )
 
             use_top_n_checkbox.change(
-                lambda use_top_n: (gr.Number(visible=use_top_n), gr.Slider(visible=not use_top_n)),
+                lambda use_top_n: (
+                    gr.Number(visible=use_top_n),
+                    gr.Slider(visible=not use_top_n),
+                ),
                 inputs=use_top_n_checkbox,
                 outputs=[top_n_input, confidence_slider],
                 show_progress="hidden",
@@ -402,8 +446,12 @@ def sample_sliders(opened=True) -> dict[_SAMPLE_KEYS, gr.components.Component]:
                     maximum=10,
                     value=1,
                     step=1,
-                    label=loc.localize("inference-settings-merge-consecutive-slider-label"),
-                    info=loc.localize("inference-settings-merge-consecutive-slider-info"),
+                    label=loc.localize(
+                        "inference-settings-merge-consecutive-slider-label"
+                    ),
+                    info=loc.localize(
+                        "inference-settings-merge-consecutive-slider-info"
+                    ),
                 )
                 audio_speed_slider = gr.Slider(
                     minimum=-10,
@@ -469,8 +517,11 @@ def locale():
 def plot_map_scatter_mapbox(lat, lon, zoom=4):
     import plotly.express as px
 
-    fig = px.scatter_map(lat=[lat], lon=[lon], zoom=zoom, map_style="open-street-map", size=[10])
-    # fig.update_traces(marker=dict(size=10, color="red"))  # Explicitly set color and size
+    fig = px.scatter_map(
+        lat=[lat], lon=[lon], zoom=zoom, map_style="open-street-map", size=[10]
+    )
+    # Explicitly set color and size
+    # fig.update_traces(marker=dict(size=10, color="red"))
     fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
     return fig
 
@@ -495,14 +546,29 @@ def species_list_coordinates(show_map=False):
                 info=loc.localize("species-list-coordinates-lon-number-info"),
             )
 
-        map_plot = gr.Plot(plot_map_scatter_mapbox(0, 0), show_label=False, scale=2, visible=show_map)
+        map_plot = gr.Plot(
+            plot_map_scatter_mapbox(0, 0), show_label=False, scale=2, visible=show_map
+        )
 
-        lat_number.change(plot_map_scatter_mapbox, inputs=[lat_number, lon_number], outputs=map_plot, show_progress="hidden")
-        lon_number.change(plot_map_scatter_mapbox, inputs=[lat_number, lon_number], outputs=map_plot, show_progress="hidden")
+        lat_number.change(
+            plot_map_scatter_mapbox,
+            inputs=[lat_number, lon_number],
+            outputs=map_plot,
+            show_progress="hidden",
+        )
+        lon_number.change(
+            plot_map_scatter_mapbox,
+            inputs=[lat_number, lon_number],
+            outputs=map_plot,
+            show_progress="hidden",
+        )
 
     with gr.Group():
         with gr.Row():
-            yearlong_checkbox = gr.Checkbox(True, label=loc.localize("species-list-coordinates-yearlong-checkbox-label"))
+            yearlong_checkbox = gr.Checkbox(
+                True,
+                label=loc.localize("species-list-coordinates-yearlong-checkbox-label"),
+            )
             week_number = gr.Slider(
                 minimum=1,
                 maximum=48,
@@ -525,9 +591,18 @@ def species_list_coordinates(show_map=False):
     def on_change(use_yearlong):
         return gr.Slider(interactive=(not use_yearlong))
 
-    yearlong_checkbox.change(on_change, inputs=yearlong_checkbox, outputs=week_number, show_progress="hidden")
+    yearlong_checkbox.change(
+        on_change, inputs=yearlong_checkbox, outputs=week_number, show_progress="hidden"
+    )
 
-    return lat_number, lon_number, week_number, sf_thresh_number, yearlong_checkbox, map_plot
+    return (
+        lat_number,
+        lon_number,
+        week_number,
+        sf_thresh_number,
+        yearlong_checkbox,
+        map_plot,
+    )
 
 
 def save_file_dialog(filetypes=(), state_key=None, default_filename=""):
@@ -540,7 +615,12 @@ def save_file_dialog(filetypes=(), state_key=None, default_filename=""):
         The selected file or None of the dialog was canceled.
     """
     initial_selection = settings.get_state(state_key, "") if state_key else ""
-    file = _WINDOW.create_file_dialog(webview.FileDialog.SAVE, file_types=filetypes, directory=initial_selection, save_filename=default_filename)  # type: ignore
+    file = _WINDOW.create_file_dialog(
+        webview.FileDialog.SAVE,
+        file_types=filetypes,
+        directory=initial_selection,
+        save_filename=default_filename,
+    )  # type: ignore
 
     if file:
         file: str = file[0] if isinstance(file, list | tuple) else file
@@ -563,7 +643,9 @@ def select_file(filetypes=(), state_key=None):
         The selected file or None of the dialog was canceled.
     """
     initial_selection = settings.get_state(state_key, "") if state_key else ""
-    files = _WINDOW.create_file_dialog(webview.FileDialog.OPEN, file_types=filetypes, directory=initial_selection)  # type: ignore
+    files = _WINDOW.create_file_dialog(
+        webview.FileDialog.OPEN, file_types=filetypes, directory=initial_selection
+    )  # type: ignore
 
     if files:
         if state_key:
@@ -588,7 +670,12 @@ def show_species_choice(choice: str, file_input):
         ]
     """
     if choice == _CUSTOM_SPECIES:
-        return [gr.Row(visible=False), gr.File(visible=True), gr.Column(visible=False), gr.Row(visible=bool(file_input))]
+        return [
+            gr.Row(visible=False),
+            gr.File(visible=True),
+            gr.Column(visible=False),
+            gr.Row(visible=bool(file_input)),
+        ]
     if choice == _PREDICT_SPECIES:
         return [
             gr.Row(visible=True),
@@ -606,7 +693,10 @@ def show_species_choice(choice: str, file_input):
 
 
 def model_selection(opened=True):
-    with gr.Group(), gr.Accordion(loc.localize("model-selection-accordion-label"), open=opened):
+    with (
+        gr.Group(),
+        gr.Accordion(loc.localize("model-selection-accordion-label"), open=opened),
+    ):
         with gr.Row():
             values = [_USE_BIRDNET_2_4, _CUSTOM_CLASSIFIER, _USE_PERCH]
 
@@ -621,12 +711,24 @@ def model_selection(opened=True):
             )
 
             with gr.Column(visible=False) as custom_classifier_selector:
-                classifier_selection_button = gr.Button(loc.localize("species-list-custom-classifier-selection-button-label"))
-                classifier_file_input = gr.Files(file_types=[".tflite"], visible=False, interactive=False, show_label=False)
+                classifier_selection_button = gr.Button(
+                    loc.localize(
+                        "species-list-custom-classifier-selection-button-label"
+                    )
+                )
+                classifier_file_input = gr.Files(
+                    file_types=[".tflite"],
+                    visible=False,
+                    interactive=False,
+                    show_label=False,
+                )
                 selected_classifier_state = gr.State()
 
                 def on_custom_classifier_selection_click():
-                    file = select_file(("TFLite classifier (*.tflite)",), state_key="custom_classifier_file")
+                    file = select_file(
+                        ("TFLite classifier (*.tflite)",),
+                        state_key="custom_classifier_file",
+                    )
 
                     if not file:
                         return None, None, None
@@ -638,9 +740,17 @@ def model_selection(opened=True):
                         labels = file.replace("Model_FP32.tflite", "Labels.txt")
 
                     if not os.path.isfile(labels):
-                        gr.Warning(loc.localize("species-list-custom-classifier-no-labelfile-warning"))
+                        gr.Warning(
+                            loc.localize(
+                                "species-list-custom-classifier-no-labelfile-warning"
+                            )
+                        )
 
-                        return file, gr.update(value=file, visible=True), gr.update(visible=False)
+                        return (
+                            file,
+                            gr.update(value=file, visible=True),
+                            gr.update(visible=False),
+                        )
 
                     return (
                         file,
@@ -648,7 +758,13 @@ def model_selection(opened=True):
                         gr.update(value=utils.read_lines(labels), visible=True),
                     )
 
-        species_list_df = gr.List(value=[], headers=["Species"], max_height=200, show_label=False, visible=False)
+        species_list_df = gr.List(
+            value=[],
+            headers=["Species"],
+            max_height=200,
+            show_label=False,
+            visible=False,
+        )
 
     classifier_selection_button.click(
         on_custom_classifier_selection_click,
@@ -682,7 +798,10 @@ def species_lists(opened=True) -> dict[_SPECIES_KEYS, gr.components.Component]:
     Returns:
         A dict with the created elements.
     """
-    with gr.Group(), gr.Accordion(loc.localize("species-list-accordion-label"), open=opened):
+    with (
+        gr.Group(),
+        gr.Accordion(loc.localize("species-list-accordion-label"), open=opened),
+    ):
         with gr.Row():
             values = [_CUSTOM_SPECIES, _PREDICT_SPECIES, _ALL_SPECIES]
 
@@ -695,12 +814,27 @@ def species_lists(opened=True) -> dict[_SPECIES_KEYS, gr.components.Component]:
             )
 
             with gr.Column(visible=False) as position_row:
-                lat_number, lon_number, week_number, sf_thresh_number, yearlong_checkbox, map_plot = species_list_coordinates()
+                (
+                    lat_number,
+                    lon_number,
+                    week_number,
+                    sf_thresh_number,
+                    yearlong_checkbox,
+                    map_plot,
+                ) = species_list_coordinates()
 
-            species_file_input = gr.File(file_types=[".txt"], visible=False, show_label=False)
+            species_file_input = gr.File(
+                file_types=[".txt"], visible=False, show_label=False
+            )
             empty_col = gr.Column()
 
-        list_df = gr.List(value=[], headers=["Species"], max_height=200, show_label=False, visible=False)
+        list_df = gr.List(
+            value=[],
+            headers=["Species"],
+            max_height=200,
+            show_label=False,
+            visible=False,
+        )
 
     species_list_radio.change(
         show_species_choice,
@@ -769,12 +903,13 @@ def _get_network_shortcuts():
     Retrieves a list of network shortcut paths from the user's Network Shortcuts folder.
     This function accesses the Network Shortcuts folder (Nethood) on a Windows system,
     iterates through its contents, and attempts to resolve `.lnk` files (shortcuts)
-    to their target paths. If successful, the resolved paths are added to the list of shortcuts.
+    to their target paths. If successful, the resolved paths are added to the list of
+    shortcuts.
     Returns:
         list: A list of resolved network shortcut paths.
     Notes:
-        - This function uses the `pythoncom` and `win32com.shell` modules, which are part of the
-          `pywin32` package.
+        - This function uses the `pythoncom` and `win32com.shell` modules, which are
+        part of the `pywin32` package.
         - Errors encountered while resolving shortcuts are printed to the console.
     """
     import pythoncom
@@ -797,11 +932,18 @@ def _get_network_shortcuts():
                     try:
                         # https://learn.microsoft.com/de-de/windows/win32/shell/links
                         # CLSID_ShellLink: Class ID for Shell Link object
-                        shell_link = pythoncom.CoCreateInstance(shell.CLSID_ShellLink, None, pythoncom.CLSCTX_INPROC_SERVER, shell.IID_IShellLink)
+                        shell_link = pythoncom.CoCreateInstance(
+                            shell.CLSID_ShellLink,
+                            None,
+                            pythoncom.CLSCTX_INPROC_SERVER,
+                            shell.IID_IShellLink,
+                        )
 
                         # https://learn.microsoft.com/de-de/windows/win32/api/objidl/nn-objidl-ipersistfile
                         # Query IPersistFile interface used to
-                        persist_file = shell_link.QueryInterface(pythoncom.IID_IPersistFile)
+                        persist_file = shell_link.QueryInterface(
+                            pythoncom.IID_IPersistFile
+                        )
 
                         # https://learn.microsoft.com/de-de/windows/win32/api/objidl/nf-objidl-ipersistfile-load
                         # Load shell link file
@@ -864,7 +1006,8 @@ def open_window(builder: list[Callable] | Callable):
     """
     Opens a GUI window using the Gradio library and the webview module.
     Args:
-        builder (list[Callable] | Callable): A callable or a list of callables that build the GUI components.
+        builder (list[Callable] | Callable): A callable or a list of callables that
+        build the GUI components.
     """
     global _URL
     multiprocessing.freeze_support()
@@ -897,7 +1040,10 @@ def open_window(builder: list[Callable] | Callable):
                 outputs.append(plot)
 
             def update_plots(*args):
-                return [plot_map_scatter_mapbox(lat, lon) for lat, lon in utils.batched(args, 2, strict=True)]
+                return [
+                    plot_map_scatter_mapbox(lat, lon)
+                    for lat, lon in utils.batched(args, 2, strict=True)
+                ]
 
             demo.load(update_plots, inputs=inputs, outputs=outputs)
 

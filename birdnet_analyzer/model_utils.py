@@ -9,18 +9,28 @@ if TYPE_CHECKING:
 
     import numpy as np
 
-    # from birdnet.acoustic.inference.core.encoding.encoding_result import AcousticFileEncodingResult # 0.2.13
-    # from birdnet.acoustic.inference.core.perf_tracker import AcousticProgressStats # 0.2.13
-    # from birdnet.acoustic.inference.core.prediction.prediction_result import AcousticFilePredictionResult # 0.2.13
-    from birdnet.acoustic_models.inference.encoding.result import AcousticFileEncodingResult
+    # from birdnet.acoustic.inference.core.encoding.encoding_result import (
+    #     AcousticFileEncodingResult,
+    # )  # 0.2.13
+    # from birdnet.acoustic.inference.core.perf_tracker import (
+    #     AcousticProgressStats,
+    # )  # 0.2.13
+    # from birdnet.acoustic.inference.core.prediction.prediction_result import (
+    #     AcousticFilePredictionResult,
+    # )  # 0.2.13
+    from birdnet.acoustic_models.inference.encoding.result import (
+        AcousticFileEncodingResult,
+    )
     from birdnet.acoustic_models.inference.perf_tracker import AcousticProgressStats
-    from birdnet.acoustic_models.inference.prediction.result import AcousticFilePredictionResult
+    from birdnet.acoustic_models.inference.prediction.result import (
+        AcousticFilePredictionResult,
+    )
     from birdnet.globals import ACOUSTIC_MODEL_VERSIONS, MODEL_LANGUAGES
 
 GLOBAL_PREFETCH_RATIO = 2
 
 
-def run_interference(
+def run_inference(
     path,
     model="birdnet",
     version: ACOUSTIC_MODEL_VERSIONS = "2.4",
@@ -45,7 +55,9 @@ def run_interference(
         if not cc_species_list:
             cc_species_list = classifier.replace(".tflite", "_Labels.txt", 1)
 
-        model = birdnet.load_custom("acoustic", version, "tf", classifier, cc_species_list)
+        model = birdnet.load_custom(
+            "acoustic", version, "tf", classifier, cc_species_list
+        )
     elif model == "birdnet":
         model = birdnet.load("acoustic", version, "tf", lang=label_language)
     elif model == "perch":
@@ -72,7 +84,9 @@ def run_interference(
     )
 
 
-def run_geomodel(lat, lon, week=None, language: MODEL_LANGUAGES = "en_us", threshold: float = 0.03):
+def run_geomodel(
+    lat, lon, week=None, language: MODEL_LANGUAGES = "en_us", threshold: float = 0.03
+):
     model = birdnet.load("geo", "2.4", "tf", lang=language)
     return model.predict(lat, lon, week=week, min_confidence=threshold)
 
@@ -144,7 +158,13 @@ def get_embeddings_array(
     return result.embeddings[:, 0, :]
 
 
-def get_species_list(lat: float, lon: float, week: int | None, lang: MODEL_LANGUAGES = "en_us", threshold: float = 0.03) -> list[str]:
+def get_species_list(
+    lat: float,
+    lon: float,
+    week: int | None,
+    lang: MODEL_LANGUAGES = "en_us",
+    threshold: float = 0.03,
+) -> list[str]:
     model = birdnet.load("geo", "2.4", "tf", lang=lang)
 
     return model.predict(lat, lon, week=week, min_confidence=threshold)

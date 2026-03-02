@@ -20,25 +20,40 @@ from birdnet_analyzer.config import ALLOWED_FILETYPES, NON_EVENT_CLASSES
 if TYPE_CHECKING:
     from multiprocessing.pool import AsyncResult
 
-    from birdnet_analyzer.config import SAMPLE_CROP_MODES, TRAINED_MODEL_OUTPUT_FORMATS, TRAINED_MODEL_SAVE_MODES, UPSAMPLING_MODES
+    from birdnet_analyzer.config import (
+        SAMPLE_CROP_MODES,
+        TRAINED_MODEL_OUTPUT_FORMATS,
+        TRAINED_MODEL_SAVE_MODES,
+        UPSAMPLING_MODES,
+    )
 
 
 def save_sample_counts(labels, y_train, output_dir: str):
     """
     Saves the count of samples per label combination to a CSV file.
 
-    The function creates a dictionary where the keys are label combinations (joined by '+') and the values are the counts of samples for each combination.
-    It then writes this information to a CSV file named "sample_counts.csv" with two columns: "Label" and "Count".
+    The function creates a dictionary where the keys are label combinations
+    (joined by '+') and the values are the counts of samples for each combination.
+    It then writes this information to a CSV file named "sample_counts.csv" with two
+    columns: "Label" and "Count".
 
     Args:
-        labels (list of str): List of label names corresponding to the columns in y_train.
-        y_train (numpy.ndarray): 2D array where each row is a binary vector indicating the presence (1) or absence (0) of each label.
+        labels (list of str): List of label names corresponding to the columns in
+                              y_train.
+        y_train (numpy.ndarray): 2D array where each row is a binary vector indicating
+                                 the presence (1) or absence (0) of each label.
     """
     samples_per_label = {}
     label_combinations = np.unique(y_train, axis=0)
 
     for label_combination in label_combinations:
-        label = "+".join([labels[i] for i in range(len(label_combination)) if label_combination[i] == 1])
+        label = "+".join(
+            [
+                labels[i]
+                for i in range(len(label_combination))
+                if label_combination[i] == 1
+            ]
+        )
         samples_per_label[label] = np.sum(np.all(y_train == label_combination, axis=1))
 
     csv_file_path = os.path.join(output_dir, "sample_counts.csv")
@@ -52,7 +67,16 @@ def save_sample_counts(labels, y_train, output_dir: str):
 
 
 def _load_audio_file(
-    f, label_vector, sample_rate=48000, fmin=0.0, fmax=15000.0, audio_speed=1.0, crop_mode: SAMPLE_CROP_MODES = "center", sig_length=3.0, overlap=0.0, min_len=1.0
+    f,
+    label_vector,
+    sample_rate=48000,
+    fmin=0.0,
+    fmax=15000.0,
+    audio_speed=1.0,
+    crop_mode: SAMPLE_CROP_MODES = "center",
+    sig_length=3.0,
+    overlap=0.0,
+    min_len=1.0,
 ):
     """Load an audio file and extract features.
     Args:
@@ -88,7 +112,8 @@ def _load_audio_file(
     else:
         sig_splits = audio.split_signal(sig, rate, sig_length, overlap, min_len)
 
-    # turns out that batch size 1 is the fastest, probably because of having to resize the model input when the number of samples in a batch changes
+    # turns out that batch size 1 is the fastest, probably because of having to resize
+    # the model input when the number of samples in a batch changes
     batch_size = 1
 
     for i in range(0, len(sig_splits), batch_size):
@@ -126,10 +151,14 @@ def _load_training_data(
     If a cache file is provided, the training data is loaded from there.
 
     Args:
-        audio_input: Path to the training data directory or path to a cache file ("train_cache.npz" for example).
-        test_data: Path to the test data directory. Defaults to None. If not specified, a validation split will be used.
-        upsampling_ratio: Ratio for upsampling underrepresented classes. Defaults to 0.0.
-        progress_callback: A callback function for monitoring progress during data loading.
+        audio_input: Path to the training data directory or path to a cache file
+                     ("train_cache.npz" for example).
+        test_data: Path to the test data directory. Defaults to None. If not specified,
+                   a validation split will be used.
+        upsampling_ratio: Ratio for upsampling underrepresented classes.
+                          Defaults to 0.0.
+        progress_callback: A callback function for monitoring progress during data
+                           loading.
         fmin: Minimum frequency for audio processing. Defaults to 0.0.
         fmax: Maximum frequency for audio processing. Defaults to 15000.0.
         audio_speed: Speed factor for audio playback. Defaults to 1.0.
@@ -138,12 +167,14 @@ def _load_training_data(
         min_len: Minimum length of audio chunks. Defaults to 1.0.
 
     Returns:
-        A tuple of (x_train, y_train, x_test, y_test, labels, is_binary, is_multi_label).
+        A tuple of (x_train, y_train, x_test, y_test, labels, is_binary, is_multi_label)
     """
 
     if audio_input.endswith(".npz"):
         if os.path.isfile(audio_input):
-            x_train, y_train, x_test, y_test, labels, is_binary, is_multi_label = _load_from_cache(audio_input)
+            x_train, y_train, x_test, y_test, labels, is_binary, is_multi_label = (
+                _load_from_cache(audio_input)
+            )
 
             return x_train, y_train, x_test, y_test, labels, is_binary, is_multi_label
 
@@ -162,7 +193,11 @@ def _load_training_data(
                 labels.append(cln_label)
 
     labels = sorted(labels)
-    valid_labels = [label for label in labels if label.lower() not in NON_EVENT_CLASSES and not label.startswith("-")]
+    valid_labels = [
+        label
+        for label in labels
+        if label.lower() not in NON_EVENT_CLASSES and not label.startswith("-")
+    ]
     is_binary = len(valid_labels) == 1
     is_multi_label = len(valid_labels) > 1 and any("," in f for f in train_folders)
 
@@ -179,10 +214,15 @@ def _load_training_data(
             )
 
     if is_binary and is_multi_label:
-        raise Exception("Error: Binary classification and multi-label not possible at the same time")
+        raise Exception(
+            "Error: Binary classification and multi-label not possible at the same time"
+        )
 
     if is_multi_label and upsampling_ratio > 0 and upsampling_mode != "repeat":
-        raise Exception("Only repeat-upsampling ist available for multi-label", "validation-only-repeat-upsampling-for-multi-label")
+        raise Exception(
+            "Only repeat-upsampling ist available for multi-label",
+            "validation-only-repeat-upsampling-for-multi-label",
+        )
 
     x_train, y_train, x_test, y_test = [], [], [], []
 
@@ -210,7 +250,8 @@ def _load_training_data(
                 (
                     os.path.join(data_path, folder, f)
                     for f in sorted(os.listdir(os.path.join(data_path, folder)))
-                    if not f.startswith(".") and f.rsplit(".", 1)[-1].lower() in ALLOWED_FILETYPES
+                    if not f.startswith(".")
+                    and f.rsplit(".", 1)[-1].lower() in ALLOWED_FILETYPES
                 ),
             )
 
@@ -235,12 +276,16 @@ def _load_training_data(
 
                 num_files_processed = 0
 
-                with tqdm.tqdm(total=len(tasks), desc=f" - loading '{folder}'", unit="f") as progress_bar:
+                with tqdm.tqdm(
+                    total=len(tasks), desc=f" - loading '{folder}'", unit="f"
+                ) as progress_bar:
                     for task in tasks:
                         result = task.get()
                         # Make sure result is not empty
-                        # Empty results might be caused by errors when loading the audio file
-                        # TODO: We should check for embeddings size in result, otherwise we can't add them to the training data
+                        # Empty results might be caused by errors when loading the
+                        # audio file
+                        # TODO: We should check for embeddings size in result, otherwise
+                        # we can't add them to the training data
                         if len(result[0]) > 0:
                             x += result[0]
                             y += result[1]
@@ -257,7 +302,11 @@ def _load_training_data(
 
     if test_data and test_data != audio_input:
         test_folders = sorted(utils.list_subdirectories(test_data))
-        allowed_test_folders = [folder for folder in test_folders if folder in train_folders and not folder.startswith("-")]
+        allowed_test_folders = [
+            folder
+            for folder in test_folders
+            if folder in train_folders and not folder.startswith("-")
+        ]
         x_test, y_test = load_data(test_data, allowed_test_folders)
     else:
         x_test = np.array([])
@@ -332,22 +381,28 @@ def train_model(
         A keras `History` object, whose `history` property contains all the metrics.
     """
 
-    x_train, y_train, x_test, y_test, labels, is_binary, is_multi_label = _load_training_data(
-        audio_input,
-        test_data=test_data,
-        upsampling_ratio=upsampling_ratio,
-        upsampling_mode=upsampling_mode,
-        fmin=fmin,
-        fmax=fmax,
-        audio_speed=audio_speed,
-        crop_mode=crop_mode,
-        overlap=overlap,
-        min_len=1.0,
-        threads=threads,
-        save_cache_to=save_cache_to,
-        progress_callback=on_data_load_end,
+    x_train, y_train, x_test, y_test, labels, is_binary, is_multi_label = (
+        _load_training_data(
+            audio_input,
+            test_data=test_data,
+            upsampling_ratio=upsampling_ratio,
+            upsampling_mode=upsampling_mode,
+            fmin=fmin,
+            fmax=fmax,
+            audio_speed=audio_speed,
+            crop_mode=crop_mode,
+            overlap=overlap,
+            min_len=1.0,
+            threads=threads,
+            save_cache_to=save_cache_to,
+            progress_callback=on_data_load_end,
+        )
     )
-    print(f"...Done. Loaded {x_train.shape[0]} training samples and {y_train.shape[1]} labels.", flush=True)
+    print(
+        f"...Done. Loaded {x_train.shape[0]} training samples "
+        + f"and {y_train.shape[1]} labels.",
+        flush=True,
+    )
     if len(x_test) > 0:
         print(f"...Loaded {x_test.shape[0]} test samples.", flush=True)
 
@@ -361,7 +416,16 @@ def train_model(
             on_trial_result(0)
 
         class BirdNetTuner(keras_tuner.BayesianOptimization):
-            def __init__(self, x_train, y_train, x_test, y_test, max_trials, executions_per_trial, on_trial_result):
+            def __init__(
+                self,
+                x_train,
+                y_train,
+                x_test,
+                y_test,
+                max_trials,
+                executions_per_trial,
+                on_trial_result,
+            ):
                 super().__init__(
                     max_trials=max_trials,
                     executions_per_trial=executions_per_trial,
@@ -384,8 +448,16 @@ def train_model(
                     classifier = model.build_linear_classifier(
                         self.y_train.shape[1],
                         self.x_train.shape[1],
-                        hidden_units=hp.Choice("hidden_units", [0, 128, 256, 512, 1024, 2048], default=hidden_units),  # type: ignore
-                        dropout=hp.Choice("dropout", [0.0, 0.25, 0.33, 0.5, 0.75, 0.9], default=dropout),  # type: ignore
+                        hidden_units=hp.Choice(
+                            "hidden_units",
+                            [0, 128, 256, 512, 1024, 2048],
+                            default=hidden_units,
+                        ),  # type: ignore
+                        dropout=hp.Choice(
+                            "dropout",
+                            [0.0, 0.25, 0.33, 0.5, 0.75, 0.9],
+                            default=dropout,
+                        ),  # type: ignore
                     )
                     # Only allow repeat upsampling in multi-label setting
                     # SMOTE is too slow
@@ -394,7 +466,9 @@ def train_model(
                     if is_multi_label:
                         upsampling_choices = ["repeat"]
 
-                    tuner_batch_size = hp.Choice("batch_size", [8, 16, 32, 64, 128], default=batch_size)
+                    tuner_batch_size = hp.Choice(
+                        "batch_size", [8, 16, 32, 64, 128], default=batch_size
+                    )
 
                     if tuner_batch_size == 8:
                         learning_rate = hp.Choice(
@@ -447,7 +521,11 @@ def train_model(
                         batch_size=tuner_batch_size,
                         learning_rate=learning_rate,
                         val_split=0.0 if len(self.x_test) > 0 else val_split,
-                        upsampling_ratio=hp.Choice("upsampling_ratio", [0.0, 0.25, 0.33, 0.5, 0.75, 1.0], default=upsampling_ratio),
+                        upsampling_ratio=hp.Choice(
+                            "upsampling_ratio",
+                            [0.0, 0.25, 0.33, 0.5, 0.75, 1.0],
+                            default=upsampling_ratio,
+                        ),
                         upsampling_mode=hp.Choice(
                             "upsampling_mode",
                             upsampling_choices,
@@ -456,8 +534,12 @@ def train_model(
                             parent_values=[0.25, 0.33, 0.5, 0.75, 1.0],
                         ),
                         train_with_mixup=hp.Boolean("mixup", default=mixup),
-                        train_with_label_smoothing=hp.Boolean("label_smoothing", default=label_smoothing),
-                        train_with_focal_loss=hp.Boolean("focal_loss", default=use_focal_loss),  # type: ignore
+                        train_with_label_smoothing=hp.Boolean(
+                            "label_smoothing", default=label_smoothing
+                        ),
+                        train_with_focal_loss=hp.Boolean(
+                            "focal_loss", default=use_focal_loss
+                        ),  # type: ignore
                         focal_loss_gamma=hp.Choice(
                             "focal_loss_gamma",
                             [0.5, 1.0, 2.0, 3.0, 4.0],
@@ -477,7 +559,9 @@ def train_model(
                     )
 
                     # Get the best validation AUPRC instead of loss
-                    best_val_auprc = history.history["val_AUPRC"][np.argmax(history.history["val_AUPRC"])]
+                    best_val_auprc = history.history["val_AUPRC"][
+                        np.argmax(history.history["val_AUPRC"])
+                    ]
                     histories.append(best_val_auprc)
 
                 keras.backend.clear_session()
@@ -488,7 +572,8 @@ def train_model(
                 if self.on_trial_result:
                     self.on_trial_result(trial_number)
 
-                # Return the negative AUPRC for minimization (keras-tuner minimizes by default)
+                # Return the negative AUPRC for minimization
+                # (keras-tuner minimizes by default)
                 return [-h for h in histories]
 
         tuner = BirdNetTuner(
@@ -504,7 +589,10 @@ def train_model(
         try:
             tuner.search()
         except model.get_empty_class_exception() as e:
-            e.message = f"Class with label {labels[e.index]} is empty. Please remove it from the training data."  # type: ignore
+            e.message = (
+                f"Class with label {labels[e.index]} is empty. "  # type: ignore
+                "Please remove it from the training data."
+            )
             e.args = (e.message,)
             raise e
 
@@ -526,7 +614,9 @@ def train_model(
             focal_loss_alpha = best_params["focal_loss_alpha"]
             focal_loss_gamma = best_params["focal_loss_gamma"]
 
-    classifier = model.build_linear_classifier(y_train.shape[1], x_train.shape[1], hidden_units, dropout)
+    classifier = model.build_linear_classifier(
+        y_train.shape[1], x_train.shape[1], hidden_units, dropout
+    )
 
     try:
         classifier, history = model.train_linear_classifier(
@@ -551,7 +641,10 @@ def train_model(
             is_multi_label=is_multi_label,
         )
     except model.get_empty_class_exception() as e:
-        e.message = f"Class with label {labels[e.index]} is empty. Please remove it from the training data."  # type: ignore
+        e.message = (
+            f"Class with label {labels[e.index]} is empty. "  # type: ignore
+            "Please remove it from the training data."
+        )
         e.args = (e.message,)
         raise e
     except Exception as e:
@@ -598,12 +691,20 @@ def train_model(
         )
 
         if model_format == "both":
-            model.save_raven_model(classifier, output, labels, mode=model_save_mode, params=params)
-            model.save_linear_classifier(classifier, output, labels, mode=model_save_mode, params=params)
+            model.save_raven_model(
+                classifier, output, labels, mode=model_save_mode, params=params
+            )
+            model.save_linear_classifier(
+                classifier, output, labels, mode=model_save_mode, params=params
+            )
         elif model_format == "tflite":
-            model.save_linear_classifier(classifier, output, labels, mode=model_save_mode, params=params)
+            model.save_linear_classifier(
+                classifier, output, labels, mode=model_save_mode, params=params
+            )
         elif model_format == "raven":
-            model.save_raven_model(classifier, output, labels, mode=model_save_mode, params=params)
+            model.save_raven_model(
+                classifier, output, labels, mode=model_save_mode, params=params
+            )
         else:
             raise ValueError(f"Unknown model output format: {model_format}")
     except Exception as e:
@@ -625,7 +726,8 @@ def train_model(
             with open(eval_file_path, "w", newline="") as f:
                 writer = csv.writer(f)
 
-                # Define all the metrics as columns, including both default and optimized threshold metrics
+                # Define all the metrics as columns, including both default and
+                # optimized threshold metrics
                 header = [
                     "Class",
                     "Precision (0.5)",
@@ -664,13 +766,16 @@ def train_model(
                         "",
                         "",
                         "",
-                        "",  # Empty cells for Threshold, TP, FP, TN, FN, Samples, Percentage
+                        "",
+                        # Empty cells for Threshold, TP, FP, TN, FN, Samples, Percentage
                     ]
                 )
 
                 # Write per-class metrics (one row per species)
                 for class_name, class_metrics in metrics["class_metrics"].items():
-                    distribution = metrics["class_distribution"].get(class_name, {"count": 0, "percentage": 0.0})
+                    distribution = metrics["class_distribution"].get(
+                        class_name, {"count": 0, "percentage": 0.0}
+                    )
                     writer.writerow(
                         [
                             class_name,
@@ -735,7 +840,8 @@ def evaluate_model(classifier, x_test, y_test, labels, threshold=None):
         x_test: Test features (embeddings)
         y_test: Test labels
         labels: List of label names
-        threshold: Classification threshold (if None, will find optimal threshold for each class)
+        threshold: Classification threshold (if None, will find optimal threshold for
+                   each class)
 
     Returns:
         Dictionary with evaluation metrics
@@ -773,7 +879,10 @@ def evaluate_model(classifier, x_test, y_test, labels, threshold=None):
     optimal_thresholds = {}
 
     # Print the metric calculation method that's being used
-    print("\nNote: The AUPRC and AUROC metrics calculated during post-training evaluation may differ")
+    print(
+        "\nNote: The AUPRC and AUROC metrics calculated during post-training evaluation"
+        " may differ"
+    )
     print("from training history values due to different calculation methods:")
     print("  - Training history uses Keras metrics calculated over batches")
     print("  - Evaluation uses scikit-learn metrics calculated over the entire dataset")
@@ -791,7 +900,9 @@ def evaluate_model(classifier, x_test, y_test, labels, threshold=None):
             f1s_default.append(class_f1_default)
 
             if threshold is None:
-                class_threshold = find_optimal_threshold(y_test[:, i], y_pred_prob[:, i])
+                class_threshold = find_optimal_threshold(
+                    y_test[:, i], y_pred_prob[:, i]
+                )
                 optimal_thresholds[labels[i]] = class_threshold
             else:
                 class_threshold = threshold
@@ -887,7 +998,19 @@ def evaluate_model(classifier, x_test, y_test, labels, threshold=None):
 
 
 def _save_to_cache(
-    path, x_train, y_train, x_test, y_test, labels, overlap=0.0, fmin=0.0, fmax=15000.0, audio_speed=1.0, crop_mode="center", is_binary=False, is_multi_label=False
+    path,
+    x_train,
+    y_train,
+    x_test,
+    y_test,
+    labels,
+    overlap=0.0,
+    fmin=0.0,
+    fmax=15000.0,
+    audio_speed=1.0,
+    crop_mode="center",
+    is_binary=False,
+    is_multi_label=False,
 ):
     """Saves training data to cache.
 

@@ -61,7 +61,18 @@ def search(
     audio_speed: float = settings["AUDIO_SPEED"]
     sig_length: float = settings.get("SIG_LENGTH", 3.0)
     duration = sig_length * audio_speed
-    results = get_search_results(queryfile, db, n_results, audio_speed, fmin, fmax, score_function, crop_mode, overlap, sig_length)
+    results = get_search_results(
+        queryfile,
+        db,
+        n_results,
+        audio_speed,
+        fmin,
+        fmax,
+        score_function,
+        crop_mode,
+        overlap,
+        sig_length,
+    )
 
     for r in results:
         window = db.get_window(r.window_id)
@@ -70,9 +81,14 @@ def search(
         filebasename = os.path.basename(file)
         filebasename = os.path.splitext(filebasename)[0]
         offset = window.offsets[0]
-        sig, rate = audio.open_audio_file(file, offset=offset, duration=duration, sample_rate=None)
-        result_path = os.path.join(output, f"{r.sort_score:.5f}_{filebasename}_{offset}_{offset + duration}.wav")
-        audio.save_signal(sig, result_path, rate) # type: ignore
+        sig, rate = audio.open_audio_file(
+            file, offset=offset, duration=duration, sample_rate=None
+        )
+        result_path = os.path.join(
+            output,
+            f"{r.sort_score:.5f}_{filebasename}_{offset}_{offset + duration}.wav",
+        )
+        audio.save_signal(sig, result_path, rate)  # type: ignore
 
     db.db.close()
 

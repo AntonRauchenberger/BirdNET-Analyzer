@@ -3,7 +3,11 @@ import argparse
 import os
 from typing import cast, get_args
 
-from birdnet.globals import ACOUSTIC_MODEL_VERSIONS, MODEL_LANGUAGE_EN_US, MODEL_LANGUAGES
+from birdnet.globals import (
+    ACOUSTIC_MODEL_VERSIONS,
+    MODEL_LANGUAGE_EN_US,
+    MODEL_LANGUAGES,
+)
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 ASCII_LOGO = r"""                        
@@ -377,6 +381,7 @@ def db_args():
         "-db",
         "--database",
         help="Path to the database folder.",
+        required=True,
     )
 
     return p

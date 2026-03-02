@@ -70,10 +70,12 @@ def get_empty_class_exception():
 def label_smoothing(y: np.ndarray, alpha=0.1):
     """
     Applies label smoothing to the given labels.
-    Label smoothing is a technique used to prevent the model from becoming overconfident by adjusting the target labels.
-    It subtracts a small value (alpha) from the correct label and distributes it among the other labels.
+    Label smoothing is a technique used to prevent the model from becoming overconfident
+    by adjusting the target labels. It subtracts a small value (alpha) from the correct
+    label and distributes it among the other labels.
     Args:
-        y (numpy.ndarray): Array of labels to be smoothed. The array should be of shape (num_labels,).
+        y (numpy.ndarray): Array of labels to be smoothed. The array should be of shape
+            (num_labels,).
         alpha (float, optional): Smoothing parameter. Default is 0.1.
     Returns:
         numpy.ndarray: The smoothed labels.
@@ -160,7 +162,9 @@ def random_split(x, y, rng: Generator, val_ratio=0.2):
         rng.shuffle(positive_indices)
 
         train_indices = positive_indices[:num_samples_train]
-        val_indices = positive_indices[num_samples_train : num_samples_train + num_samples_val]
+        val_indices = positive_indices[
+            num_samples_train : num_samples_train + num_samples_val
+        ]
 
         x_train.append(x[train_indices])
         y_train.append(y[train_indices])
@@ -178,7 +182,9 @@ def random_split(x, y, rng: Generator, val_ratio=0.2):
     rng.shuffle(non_event_indices)
 
     train_indices = non_event_indices[:num_samples_train]
-    val_indices = non_event_indices[num_samples_train : num_samples_train + num_samples_val]
+    val_indices = non_event_indices[
+        num_samples_train : num_samples_train + num_samples_val
+    ]
 
     x_train.append(x[train_indices])
     y_train.append(y[train_indices])
@@ -239,7 +245,9 @@ def random_multilabel_split(x, y, rng: Generator, val_ratio=0.2):
             rng.shuffle(indices)
 
             train_indices = indices[:num_samples_train]
-            val_indices = indices[num_samples_train : num_samples_train + num_samples_val]
+            val_indices = indices[
+                num_samples_train : num_samples_train + num_samples_val
+            ]
 
             x_train.append(x[train_indices])
             y_train.append(y[train_indices])
@@ -264,17 +272,28 @@ def random_multilabel_split(x, y, rng: Generator, val_ratio=0.2):
     return x_train, y_train, x_val, y_val
 
 
-def upsample_core(x: np.ndarray, y: np.ndarray, min_samples: int, rng: Generator, apply, is_binary: bool, size=2):
+def upsample_core(
+    x: np.ndarray,
+    y: np.ndarray,
+    min_samples: int,
+    rng: Generator,
+    apply,
+    is_binary: bool,
+    size=2,
+):
     """
     Upsamples the minority class in the dataset using the specified apply function.
     Parameters:
         x (np.ndarray): The feature matrix.
         y (np.ndarray): The target labels.
-        min_samples (int): The minimum number of samples required for the minority class.
+        min_samples (int): The minimum number of samples required for the minority
+            class.
         rng (Generator): A random number generator.
-        apply (callable): A function that applies the SMOTE or any other algorithm to the data.
+        apply (callable): A function that applies the SMOTE or any other algorithm to
+            the data.
         is_binary (bool): Whether the classification is binary.
-        size (int, optional): The number of samples to generate in each iteration. Default is 2.
+        size (int, optional): The number of samples to generate in each iteration.
+            Default is 2.
     Returns:
         tuple: A tuple containing the upsampled feature matrix and target labels.
     """
@@ -306,10 +325,18 @@ def upsample_core(x: np.ndarray, y: np.ndarray, min_samples: int, rng: Generator
     return x_temp, y_temp
 
 
-def upsampling(x: np.ndarray, y: np.ndarray, rng: Generator, is_binary: bool, ratio=0.5, mode="repeat"):
+def upsampling(
+    x: np.ndarray,
+    y: np.ndarray,
+    rng: Generator,
+    is_binary: bool,
+    ratio=0.5,
+    mode="repeat",
+):
     """Balance data through upsampling.
 
-    We upsample minority classes to have at least 10% (ratio=0.1) of the samples of the majority class.
+    We upsample minority classes to have at least 10% (ratio=0.1) of the samples of the
+    majority class.
 
     Args:
         x: Samples.
@@ -322,7 +349,11 @@ def upsampling(x: np.ndarray, y: np.ndarray, rng: Generator, is_binary: bool, ra
     Returns:
         Upsampled data.
     """
-    min_samples = int(max(y.sum(axis=0), len(y) - y.sum(axis=0)) * ratio) if is_binary else int(np.max(y.sum(axis=0)) * ratio)
+    min_samples = (
+        int(max(y.sum(axis=0), len(y) - y.sum(axis=0)) * ratio)
+        if is_binary
+        else int(np.max(y.sum(axis=0)) * ratio)
+    )
     x_temp = []
     y_temp = []
 
@@ -331,7 +362,9 @@ def upsampling(x: np.ndarray, y: np.ndarray, rng: Generator, is_binary: bool, ra
         def applyRepeat(x, y, random_index):
             return x[random_index[0]], y[random_index[0]]
 
-        x_temp, y_temp = upsample_core(x, y, min_samples, rng, applyRepeat, is_binary, size=1)
+        x_temp, y_temp = upsample_core(
+            x, y, min_samples, rng, applyRepeat, is_binary, size=1
+        )
 
     elif mode == "mean":
 
@@ -345,11 +378,15 @@ def upsampling(x: np.ndarray, y: np.ndarray, rng: Generator, is_binary: bool, ra
 
         def applyLinearCombination(x, y, random_indices):
             alpha = rng.uniform(0, 1)
-            new_sample = alpha * x[random_indices[0]] + (1 - alpha) * x[random_indices[1]]
+            new_sample = (
+                alpha * x[random_indices[0]] + (1 - alpha) * x[random_indices[1]]
+            )
 
             return new_sample, y[random_indices[0]]
 
-        x_temp, y_temp = upsample_core(x, y, min_samples, rng, applyLinearCombination, is_binary)
+        x_temp, y_temp = upsample_core(
+            x, y, min_samples, rng, applyLinearCombination, is_binary
+        )
 
     elif mode == "smote":
 
@@ -363,7 +400,9 @@ def upsampling(x: np.ndarray, y: np.ndarray, rng: Generator, is_binary: bool, ra
 
             return new_sample, y[random_index[0]]
 
-        x_temp, y_temp = upsample_core(x, y, min_samples, rng, applySmote, is_binary, size=1)
+        x_temp, y_temp = upsample_core(
+            x, y, min_samples, rng, applySmote, is_binary, size=1
+        )
 
     if len(x_temp) > 0:
         x = np.vstack((x, np.array(x_temp)))
@@ -386,7 +425,8 @@ def build_linear_classifier(num_labels, input_size, hidden_units=0, dropout=0.0)
     Args:
         num_labels: Output size.
         input_size: Size of the input.
-        hidden_units: If > 0, creates another hidden layer with the given number of units.
+        hidden_units: If > 0, creates another hidden layer with the given number of
+            units.
         dropout: Dropout rate.
 
     Returns:
@@ -401,12 +441,25 @@ def build_linear_classifier(num_labels, input_size, hidden_units=0, dropout=0.0)
         if dropout > 0:
             model.add(keras.layers.Dropout(dropout))
 
-        model.add(keras.layers.Dense(hidden_units, activation="relu", kernel_regularizer=regularizer, kernel_initializer="he_normal"))
+        model.add(
+            keras.layers.Dense(
+                hidden_units,
+                activation="relu",
+                kernel_regularizer=regularizer,
+                kernel_initializer="he_normal",
+            )
+        )
 
     if dropout > 0:
         model.add(keras.layers.Dropout(dropout))
 
-    model.add(keras.layers.Dense(num_labels, kernel_regularizer=regularizer, kernel_initializer="glorot_uniform"))
+    model.add(
+        keras.layers.Dense(
+            num_labels,
+            kernel_regularizer=regularizer,
+            kernel_initializer="glorot_uniform",
+        )
+    )
     model.add(keras.layers.Activation("sigmoid"))
 
     return model
@@ -450,8 +503,10 @@ def train_linear_classifier(
         upsampling_ratio: Upsampling ratio.
         upsampling_mode: Upsampling mode.
         train_with_mixup: If True, applies mixup to the training data.
-        train_with_label_smoothing: If True, applies label smoothing to the training data.
-        train_with_focal_loss: If True, uses focal loss instead of binary cross-entropy loss.
+        train_with_label_smoothing: If True, applies label smoothing to the training
+            data.
+        train_with_focal_loss: If True, uses focal loss instead of binary cross-entropy
+            loss.
         focal_loss_gamma: Focal loss gamma parameter.
         focal_loss_alpha: Focal loss alpha parameter.
         is_multi_label: If True, multi-label classification is used.
@@ -481,15 +536,21 @@ def train_linear_classifier(
 
     if val_split > 0:
         if not is_multi_label:
-            x_train, y_train, x_val, y_val = random_split(x_train, y_train, rng, val_split)
+            x_train, y_train, x_val, y_val = random_split(
+                x_train, y_train, rng, val_split
+            )
         else:
-            x_train, y_train, x_val, y_val = random_multilabel_split(x_train, y_train, rng, val_split)
+            x_train, y_train, x_val, y_val = random_multilabel_split(
+                x_train, y_train, rng, val_split
+            )
     else:
         x_val = x_test
         y_val = y_test
 
     if upsampling_ratio > 0:
-        x_train, y_train = upsampling(x_train, y_train, rng, upsampling_ratio, upsampling_mode)
+        x_train, y_train = upsampling(
+            x_train, y_train, rng, upsampling_ratio, upsampling_mode
+        )
 
     if train_with_mixup and not is_binary_classification:
         x_train, y_train = mixup(x_train, y_train, rng)
@@ -525,7 +586,9 @@ def train_linear_classifier(
     callbacks.append(keras.callbacks.LearningRateScheduler(lr_schedule))
 
     def _focal_loss(y_true, y_pred):
-        return focal_loss(y_true, y_pred, gamma=focal_loss_gamma, alpha=focal_loss_alpha)
+        return focal_loss(
+            y_true, y_pred, gamma=focal_loss_gamma, alpha=focal_loss_alpha
+        )
 
     loss_function = _focal_loss if train_with_focal_loss else custom_loss
 
@@ -550,7 +613,14 @@ def train_linear_classifier(
         ],
     )
 
-    history = classifier.fit(x_train, y_train, epochs=epochs, batch_size=batch_size, validation_data=(x_val, y_val), callbacks=callbacks)
+    history = classifier.fit(
+        x_train,
+        y_train,
+        epochs=epochs,
+        batch_size=batch_size,
+        validation_data=(x_val, y_val),
+        callbacks=callbacks,
+    )
 
     os.environ["CUDA_VISIBLE_DEVICES"] = setting_cache
 
@@ -558,7 +628,11 @@ def train_linear_classifier(
 
 
 def save_linear_classifier(
-    classifier, model_path: str, labels: list[str], mode: Literal["replace", "append"] = "replace", params: tuple[list[str], list] | None = None
+    classifier,
+    model_path: str,
+    labels: list[str],
+    mode: Literal["replace", "append"] = "replace",
+    params: tuple[list[str], list] | None = None,
 ):
     """Saves the classifier as a tflite model, as well as the used labels in a .txt.
 
@@ -570,7 +644,9 @@ def save_linear_classifier(
     if mode not in ("replace", "append"):
         raise ValueError("Model save mode must be either 'replace' or 'append'")
 
-    saved_model_path, original_labels = AcousticPBDownloaderV2_4.get_model_path_and_labels("en_us")
+    saved_model_path, original_labels = (
+        AcousticPBDownloaderV2_4.get_model_path_and_labels("en_us")
+    )
     saved_model = tf.saved_model.load(saved_model_path)
     inputs = keras.Input(shape=(144000,), dtype=tf.float32, name="input_audio")
     wrapper = WrappedSavedModel(saved_model.signatures["embeddings"])(inputs)
@@ -579,7 +655,9 @@ def save_linear_classifier(
         output = classifier(wrapper)
     elif mode == "append":
         basic = WrappedSavedModel(saved_model.signatures["basic"])(inputs)
-        output = keras.layers.concatenate([basic, classifier(wrapper)], name="combined_output")
+        output = keras.layers.concatenate(
+            [basic, classifier(wrapper)], name="combined_output"
+        )
 
     combined_model = keras.Model(inputs=inputs, outputs=output, name="basic")
 
@@ -615,14 +693,15 @@ def save_raven_model(
     params: tuple[list[str], list] | None = None,
 ):
     """
-    Save a TensorFlow model with a custom classifier and associated metadata for use with BirdNET.
+    Save a TensorFlow model with a custom classifier and associated metadata for use
+    with BirdNET.
 
     Args:
         classifier (tf.keras.Model): The custom classifier model to be saved.
         model_path (str): The path where the model will be saved.
         labels (list[str]): A list of labels associated with the classifier.
-        mode (str, optional): The mode for saving the model. Can be either "replace" or "append".
-                              Defaults to "replace".
+        mode (str, optional): The mode for saving the model. Can be either "replace" or
+            "append". Defaults to "replace".
 
     Raises:
         ValueError: If the mode is not "replace" or "append".
@@ -631,12 +710,20 @@ def save_raven_model(
         None
     """
 
-    saved_model_path, original_labels = AcousticPBDownloaderV2_4.get_model_path_and_labels("en_us")
+    saved_model_path, original_labels = (
+        AcousticPBDownloaderV2_4.get_model_path_and_labels("en_us")
+    )
     saved_model = tf.saved_model.load(saved_model_path)
-    model_cls = custom_models.CombinedModelAppendWithSigmoid if mode == "append" else custom_models.CombinedModelReplaceWithSigmoid
+    model_cls = (
+        custom_models.CombinedModelAppendWithSigmoid
+        if mode == "append"
+        else custom_models.CombinedModelReplaceWithSigmoid
+    )
     combined_model = model_cls(saved_model, classifier)
 
-    @tf.function(input_signature=[tf.TensorSpec(shape=[None, 144000], dtype=tf.float32)])  # pyright: ignore[reportCallIssue]
+    @tf.function(
+        input_signature=[tf.TensorSpec(shape=[None, 144000], dtype=tf.float32)]
+    )  # pyright: ignore[reportCallIssue]
     def basic(inputs):
         return {"scores": combined_model(inputs)}
 
@@ -653,12 +740,16 @@ def save_raven_model(
     if mode == "append":
         labels = [*original_labels, *labels]
 
-    labelIds = [label[:4].replace(" ", "") + str(i) for i, label in enumerate(labels, 1)]
+    labelIds = [
+        label[:4].replace(" ", "") + str(i) for i, label in enumerate(labels, 1)
+    ]
     labels_dir = os.path.join(model_path, "labels")
 
     os.makedirs(labels_dir, exist_ok=True)
 
-    with open(os.path.join(labels_dir, "label_names.csv"), "w", newline="") as labelsfile:
+    with open(
+        os.path.join(labels_dir, "label_names.csv"), "w", newline=""
+    ) as labelsfile:
         labelwriter = csv.writer(labelsfile)
         labelwriter.writerows(zip(labelIds, labels, strict=True))
 
@@ -680,9 +771,9 @@ def save_raven_model(
             "modelDescription": "Custom classifier trained with BirdNET "
             + model_version
             + " embeddings.\n"
-            + "BirdNET was developed by the K. Lisa Yang Center for Conservation Bioacoustics"
-            + "at the Cornell Lab of Ornithology in collaboration with Chemnitz University of Technology.\n\n"
-            + "https://birdnet.cornell.edu",
+            + "BirdNET was developed by the K. Lisa Yang Center for Conservation "
+            + "Bioacoustics at the Cornell Lab of Ornithology in collaboration with "
+            + "Chemnitz University of Technology.\n\nhttps://birdnet.cornell.edu",
             "modelTypeConfig": {"modelType": "RECOGNITION"},
             "signatures": [
                 {
@@ -712,8 +803,9 @@ def focal_loss(y_true, y_pred, gamma=2.0, alpha=0.25, epsilon=1e-7):
     """
     Focal loss for better handling of class imbalance.
 
-    This loss function gives more weight to hard examples and down-weights easy examples.
-    Particularly helpful for imbalanced datasets where some classes have few samples.
+    This loss function gives more weight to hard examples and down-weights easy
+    examples. Particularly helpful for imbalanced datasets where some classes have few
+    samples.
 
     Args:
         y_true: Ground truth labels.
@@ -738,8 +830,14 @@ def focal_loss(y_true, y_pred, gamma=2.0, alpha=0.25, epsilon=1e-7):
 
 
 def custom_loss(y_true, y_pred, epsilon=1e-7):
-    positive_loss = -tf.reduce_sum(y_true * tf.math.log(tf.clip_by_value(y_pred, epsilon, 1.0 - epsilon)), axis=-1)
-    negative_loss = -tf.reduce_sum((1 - y_true) * tf.math.log(tf.clip_by_value(1 - y_pred, epsilon, 1.0 - epsilon)), axis=-1)
+    positive_loss = -tf.reduce_sum(
+        y_true * tf.math.log(tf.clip_by_value(y_pred, epsilon, 1.0 - epsilon)), axis=-1
+    )
+    negative_loss = -tf.reduce_sum(
+        (1 - y_true)
+        * tf.math.log(tf.clip_by_value(1 - y_pred, epsilon, 1.0 - epsilon)),
+        axis=-1,
+    )
 
     return positive_loss + negative_loss
 
@@ -754,14 +852,18 @@ def flat_sigmoid(x, sensitivity=-1, bias=1.0):
     We transform the bias parameter to a range of [-100, 100] with the formula:
         transformed_bias = (bias - 1.0) * 10.0
 
-    Thus, higher bias values will shift the sigmoid function to the right on the x-axis, making it more "sensitive".
+    Thus, higher bias values will shift the sigmoid function to the right on the x-axis,
+    making it more "sensitive".
 
-    Note: Not sure why we are clipping, must be for numerical stability somewhere else in the code.
+    Note: Not sure why we are clipping, must be for numerical stability somewhere else
+    in the code.
 
     Args:
         x (array-like): Input data.
-        sensitivity (float, optional): Sensitivity parameter for the sigmoid function. Default is -1.
-        bias (float, optional): Bias parameter to shift the sigmoid function on the x-axis. Must be in the range [0.01, 1.99]. Default is 1.0.
+        sensitivity (float, optional): Sensitivity parameter for the sigmoid function.
+            Default is -1.
+        bias (float, optional): Bias parameter to shift the sigmoid function on the
+            x-axis. Must be in the range [0.01, 1.99]. Default is 1.0.
 
     Returns:
         numpy.ndarray: Transformed data after applying the flat sigmoid function.

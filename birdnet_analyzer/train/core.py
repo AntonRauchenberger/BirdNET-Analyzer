@@ -3,7 +3,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from birdnet_analyzer.config import SAMPLE_CROP_MODES, TRAINED_MODEL_OUTPUT_FORMATS, TRAINED_MODEL_SAVE_MODES, UPSAMPLING_MODES
+    from birdnet_analyzer.config import (
+        SAMPLE_CROP_MODES,
+        TRAINED_MODEL_OUTPUT_FORMATS,
+        TRAINED_MODEL_SAVE_MODES,
+        UPSAMPLING_MODES,
+    )
 
 
 def train(
@@ -40,34 +45,55 @@ def train(
     """
     Trains a custom classifier model using the BirdNET-Analyzer framework.
     Args:
-        audio_input (str): Path to the training data directory or path to a cache file ("train_cache.npz" for example).
-        test_data (str, optional): Path to the test data directory. Defaults to None. If not specified, a validation split will be used.
-        output (str, optional): Path to save the trained model. Defaults to "checkpoints/custom/Custom_Classifier".
-        crop_mode (Literal["center", "first", "segments", "smart"], optional): Mode for cropping audio samples. Defaults to "center".
+        audio_input (str): Path to the training data directory or path to a cache file
+                           ("train_cache.npz" for example).
+        test_data (str, optional): Path to the test data directory. Defaults to None.
+                                   If not specified, a validation split will be used.
+        output (str, optional): Path to save the trained model.
+                                Defaults to "checkpoints/custom/Custom_Classifier".
+        crop_mode (Literal["center", "first", "segments", "smart"], optional): Mode for
+            cropping audio samples. Defaults to "center".
         overlap (float, optional): Overlap ratio for audio segments. Defaults to 0.0.
         epochs (int, optional): Number of training epochs. Defaults to 50.
         batch_size (int, optional): Batch size for training. Defaults to 32.
-        val_split (float, optional): Fraction of data to use for validation. Defaults to 0.2.
-        learning_rate (float, optional): Learning rate for the optimizer. Defaults to 0.0001.
-        use_focal_loss (bool, optional): Whether to use focal loss for training. Defaults to False.
-        focal_loss_gamma (float, optional): Gamma parameter for focal loss. Defaults to 2.0.
-        focal_loss_alpha (float, optional): Alpha parameter for focal loss. Defaults to 0.25.
-        hidden_units (int, optional): Number of hidden units in the model. Defaults to 0.
+        val_split (float, optional): Fraction of data to use for validation.
+                                     Defaults to 0.2.
+        learning_rate (float, optional): Learning rate for the optimizer.
+                                         Defaults to 0.0001.
+        use_focal_loss (bool, optional): Whether to use focal loss for training.
+                                         Defaults to False.
+        focal_loss_gamma (float, optional): Gamma parameter for focal loss.
+                                            Defaults to 2.0.
+        focal_loss_alpha (float, optional): Alpha parameter for focal loss.
+                                            Defaults to 0.25.
+        hidden_units (int, optional): Number of hidden units in the model. Defaults to 0
         dropout (float, optional): Dropout rate for regularization. Defaults to 0.0.
-        label_smoothing (bool, optional): Whether to use label smoothing. Defaults to False.
-        mixup (bool, optional): Whether to use mixup data augmentation. Defaults to False.
-        upsampling_ratio (float, optional): Ratio for upsampling underrepresented classes. Defaults to 0.0.
-        upsampling_mode (Literal["repeat", "mean", "smote"], optional): Mode for upsampling. Defaults to "repeat".
-        model_format (Literal["tflite", "raven", "both"], optional): Format to save the trained model. Defaults to "tflite".
-        model_save_mode (Literal["replace", "append"], optional): Save mode for the model. Defaults to "replace".
-        save_cache_to (str | None, optional): Path to save the cache file. Defaults to None.
+        label_smoothing (bool, optional): Whether to use label smoothing.
+                                          Defaults to False.
+        mixup (bool, optional): Whether to use mixup data augmentation.
+                                Defaults to False.
+        upsampling_ratio (float, optional): Ratio for upsampling underrepresented
+                                            classes. Defaults to 0.0.
+        upsampling_mode (Literal["repeat", "mean", "smote"], optional): Mode for
+            upsampling. Defaults to "repeat".
+        model_format (Literal["tflite", "raven", "both"], optional): Format to save the
+            trained model. Defaults to "tflite".
+        model_save_mode (Literal["replace", "append"], optional): Save mode for the
+            model. Defaults to "replace".
+        save_cache_to (str | None, optional): Path to save the cache file.
+                                              Defaults to None.
         threads (int, optional): Number of CPU threads to use. Defaults to 1.
-        fmin (float, optional): Minimum frequency for bandpass filtering. Defaults to 0.0.
-        fmax (float, optional): Maximum frequency for bandpass filtering. Defaults to 15000.0.
+        fmin (float, optional): Minimum frequency for bandpass filtering.
+                                Defaults to 0.0.
+        fmax (float, optional): Maximum frequency for bandpass filtering.
+                                Defaults to 15000.0.
         audio_speed (float, optional): Speed factor for audio playback. Defaults to 1.0.
-        autotune (bool, optional): Whether to use hyperparameter autotuning. Defaults to False.
-        autotune_trials (int, optional): Number of trials for autotuning. Defaults to 50.
-        autotune_executions_per_trial (int, optional): Number of executions per autotuning trial. Defaults to 1.
+        autotune (bool, optional): Whether to use hyperparameter autotuning.
+                                   Defaults to False.
+        autotune_trials (int, optional): Number of trials for autotuning.
+                                         Defaults to 50.
+        autotune_executions_per_trial (int, optional): Number of executions per
+            autotuning trial. Defaults to 1.
     Returns:
         None
     """

@@ -106,7 +106,7 @@ filterwarnings = [
 
 [tool.ruff]
 exclude = ["conf.py"]
-line-length = 165
+line-length = 88
 
 [tool.ruff.lint]
 select = [

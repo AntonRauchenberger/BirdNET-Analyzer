@@ -9,7 +9,8 @@ import gradio as gr
 import birdnet_analyzer.gui.utils as gu
 
 if TYPE_CHECKING:
-    # from birdnet.acoustic.inference.core.perf_tracker import AcousticProgressStats # 0.2.13
+    # 0.2.13
+    # from birdnet.acoustic.inference.core.perf_tracker import AcousticProgressStats
     from birdnet.acoustic_models.inference.perf_tracker import AcousticProgressStats
     from birdnet.globals import MODEL_LANGUAGES
 
@@ -18,17 +19,15 @@ if TYPE_CHECKING:
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 
-foo_counter = 0
-
 
 def on_progress(update: AcousticProgressStats, progress: gr.Progress):
-    global foo_counter  # noqa: PLW0603
-
-    progress(foo_counter / 10, desc="FOOOOOOO")
-    print(f"\ncounter: {foo_counter}\n")
-    foo_counter += 1
-    # if progress is not None and update.progress_current and update.progress_total:
-    #     progress((update.progress_current, update.progress_total), total=update.progress_total, unit="files", desc="es war einmal")
+    if progress is not None and update.progress_current and update.progress_total:
+        progress(
+            (update.progress_current, update.progress_total),
+            total=update.progress_total,
+            unit="files",
+            desc="es war einmal",
+        )
 
 
 def run_analysis(
@@ -96,16 +95,24 @@ def run_analysis(
     from birdnet_analyzer.analyze import analyze
 
     if species_list_choice == gu._CUSTOM_SPECIES:
-        gu.validate(species_list_file, loc.localize("validation-no-species-list-selected"))
+        gu.validate(
+            species_list_file, loc.localize("validation-no-species-list-selected")
+        )
 
     locale = locale.lower()
-    custom_classifier = custom_classifier_file if selected_model == gu._CUSTOM_CLASSIFIER else None
+    custom_classifier = (
+        custom_classifier_file if selected_model == gu._CUSTOM_CLASSIFIER else None
+    )
     use_perch = selected_model == gu._USE_PERCH
     slist = species_list_file if species_list_choice == gu._CUSTOM_SPECIES else None
     lat = lat if species_list_choice == gu._PREDICT_SPECIES else None
     lon = lon if species_list_choice == gu._PREDICT_SPECIES else None
     week = None if use_yearlong else week
-    audio_speed = max(0.1, 1.0 / (audio_speed * -1)) if audio_speed < 0 else max(1.0, float(audio_speed))
+    audio_speed = (
+        max(0.1, 1.0 / (audio_speed * -1))
+        if audio_speed < 0
+        else max(1.0, float(audio_speed))
+    )
 
     if selected_model == gu._CUSTOM_CLASSIFIER and custom_classifier_file is None:
         raise gr.Error(loc.localize("validation-no-custom-classifier-selected"))
@@ -137,7 +144,9 @@ def run_analysis(
         birdnet="2.4",
         classifier=custom_classifier,
         cc_species_list=None,  # always default search path in GUI currently
-        on_update=partial(on_progress, progress=progress) if callable(progress) else None,
+        on_update=partial(on_progress, progress=progress)
+        if callable(progress)
+        else None,
         save_params=save_params,
         n_producers=n_producers,
         n_workers=n_workers,

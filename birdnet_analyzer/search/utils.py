@@ -22,7 +22,9 @@ def _get_usearch_metric_name(db: SQLiteUSearchDB) -> str | None:
     return str(usearch_cfg.get("metric_name", "")).upper() or None
 
 
-def _search_ann_ip(db: SQLiteUSearchDB, query_embedding: np.ndarray, n_results: int) -> list[SearchResult]:
+def _search_ann_ip(
+    db: SQLiteUSearchDB, query_embedding: np.ndarray, n_results: int
+) -> list[SearchResult]:
     matches = db.ui.search(query_embedding, count=n_results)
     return [
         SearchResult(window_id=int(window_id), sort_score=float(score))
@@ -47,7 +49,14 @@ def euclidean_scoring_inverse(a, b):
 
 
 def get_query_embedding(
-    queryfile_path, crop_mode: CROP_MODES = "center", crop_overlap=0.0, bandpass_fmin=0, bandpass_fmax=15000, audio_speed=1.0, sig_length=3.0, sig_minlen=1.0
+    queryfile_path,
+    crop_mode: CROP_MODES = "center",
+    crop_overlap=0.0,
+    bandpass_fmin=0,
+    bandpass_fmax=15000,
+    audio_speed=1.0,
+    sig_length=3.0,
+    sig_minlen=1.0,
 ):
     """
     Extracts the embedding for a query file. Reads only the first 3 seconds
@@ -68,7 +77,9 @@ def get_query_embedding(
     if crop_mode == "center":
         sig_splits = [audio.crop_center(sig, rate, sig_length)]
     elif crop_mode == "first":
-        sig_splits = [audio.split_signal(sig, rate, sig_length, crop_overlap, sig_minlen)[0]]
+        sig_splits = [
+            audio.split_signal(sig, rate, sig_length, crop_overlap, sig_minlen)[0]
+        ]
     else:
         sig_splits = audio.split_signal(sig, rate, sig_length, crop_overlap, sig_minlen)
 
@@ -108,9 +119,13 @@ def get_search_results(
     elif score_function == "dot":
         score_fn = np.dot
     elif score_function == "euclidean":
-        score_fn = euclidean_scoring_inverse  # TODO: this is a bit hacky since the search function expects the score to be high for similar embeddings
+        # TODO: this is a bit hacky since the search function expects the score to be
+        # high for similar embeddings
+        score_fn = euclidean_scoring_inverse
     else:
-        raise ValueError(f"Invalid score function. Choose {', '.join(get_args(SCORE_FUNCTIONS))}.")
+        raise ValueError(
+            f"Invalid score function. Choose {', '.join(get_args(SCORE_FUNCTIONS))}."
+        )
 
     db_embeddings_count = db.count_embeddings()
     n_results = min(n_results, db_embeddings_count - 1)
@@ -127,7 +142,9 @@ def get_search_results(
         if use_ann:
             sorted_results = _search_ann_ip(db, embedding, n_results)
         else:
-            results, scores = brutalism.threaded_brute_search(db, embedding, n_results, score_fn)
+            results, scores = brutalism.threaded_brute_search(
+                db, embedding, n_results, score_fn
+            )
             sorted_results = results.search_results
 
         if not use_ann and score_function == "euclidean":
@@ -143,7 +160,11 @@ def get_search_results(
     search_results: list[SearchResult] = []
 
     for window_id, scores in scores_by_embedding_id.items():
-        search_results.append(SearchResult(window_id=window_id, sort_score=np.sum(scores) / len(query_embeddings)))
+        search_results.append(
+            SearchResult(
+                window_id=window_id, sort_score=np.sum(scores) / len(query_embeddings)
+            )
+        )
 
     reverse = score_function != "euclidean"
 

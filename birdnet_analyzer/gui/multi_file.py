@@ -94,7 +94,11 @@ def run_batch_analysis(
         else [loc.localize("multi-tab-result-dataframe-column-success-header")]
     )
 
-    return gr.update(value=skipped_files, headers=header, elem_classes=None if skipped_files else "success")
+    return gr.update(
+        value=skipped_files,
+        headers=header,
+        elem_classes=None if skipped_files else "success",
+    )
 
 
 def build_multi_analysis_tab():
@@ -104,12 +108,18 @@ def build_multi_analysis_tab():
 
         with gr.Row():
             with gr.Column():
-                select_directory_btn = gr.Button(loc.localize("multi-tab-input-selection-button-label"))
+                select_directory_btn = gr.Button(
+                    loc.localize("multi-tab-input-selection-button-label")
+                )
                 directory_input = gr.Matrix(
                     interactive=False,
                     headers=[
-                        loc.localize("multi-tab-samples-dataframe-column-subpath-header"),
-                        loc.localize("multi-tab-samples-dataframe-column-duration-header"),
+                        loc.localize(
+                            "multi-tab-samples-dataframe-column-subpath-header"
+                        ),
+                        loc.localize(
+                            "multi-tab-samples-dataframe-column-duration-header"
+                        ),
                     ],
                 )
 
@@ -119,15 +129,27 @@ def build_multi_analysis_tab():
                     if folder:
                         files_and_durations = gu.get_audio_files_and_durations(folder)
                         if len(files_and_durations) > 100:
-                            return [folder, [*files_and_durations[:100], ("...", "...")]]
+                            return [
+                                folder,
+                                [*files_and_durations[:100], ("...", "...")],
+                            ]
                         return [folder, files_and_durations]
 
-                    return ["", [[loc.localize("multi-tab-samples-dataframe-no-files-found")]]]
+                    return [
+                        "",
+                        [[loc.localize("multi-tab-samples-dataframe-no-files-found")]],
+                    ]
 
-                select_directory_btn.click(select_directory_on_empty, outputs=[input_directory_state, directory_input], show_progress="full")
+                select_directory_btn.click(
+                    select_directory_on_empty,
+                    outputs=[input_directory_state, directory_input],
+                    show_progress="full",
+                )
 
             with gr.Column():
-                select_out_directory_btn = gr.Button(loc.localize("multi-tab-output-selection-button-label"))
+                select_out_directory_btn = gr.Button(
+                    loc.localize("multi-tab-output-selection-button-label")
+                )
                 selected_out_textbox = gr.Textbox(
                     label=loc.localize("multi-tab-output-textbox-label"),
                     interactive=False,
@@ -144,9 +166,14 @@ def build_multi_analysis_tab():
                     show_progress="hidden",
                 )
 
-        sample_settings, species_settings, model_settings = gu.sample_species_model_settings(opened=False)
+        sample_settings, species_settings, model_settings = (
+            gu.sample_species_model_settings(opened=False)
+        )
 
-        with gr.Group(), gr.Accordion(loc.localize("multi-tab-output-accordion-label"), open=True):
+        with (
+            gr.Group(),
+            gr.Accordion(loc.localize("multi-tab-output-accordion-label"), open=True),
+        ):
             output_type_radio = gr.CheckboxGroup(
                 list(OUTPUT_TYPE_MAP.items()),
                 value="table",
@@ -162,7 +189,9 @@ def build_multi_analysis_tab():
 
         bs_number, producers_number, workers_number = gu.computing_settings()
         locale_radio = gu.locale()
-        start_batch_analysis_btn = gr.Button(loc.localize("analyze-start-button-label"), variant="huggingface")
+        start_batch_analysis_btn = gr.Button(
+            loc.localize("analyze-start-button-label"), variant="huggingface"
+        )
         result_grid = gr.Matrix(headers=[""], col_count=1)
         inputs = [
             output_directory_predict_state,
@@ -196,10 +225,20 @@ def build_multi_analysis_tab():
         def show_additional_columns(values):
             return gr.update(visible="csv" in values)
 
-        start_batch_analysis_btn.click(run_batch_analysis, inputs=inputs, outputs=result_grid)
-        output_type_radio.change(show_additional_columns, inputs=output_type_radio, outputs=additional_columns_)
+        start_batch_analysis_btn.click(
+            run_batch_analysis, inputs=inputs, outputs=result_grid
+        )
+        output_type_radio.change(
+            show_additional_columns,
+            inputs=output_type_radio,
+            outputs=additional_columns_,
+        )
 
-    return species_settings["lat_number"], species_settings["lon_number"], species_settings["map_plot"]
+    return (
+        species_settings["lat_number"],
+        species_settings["lon_number"],
+        species_settings["map_plot"],
+    )
 
 
 if __name__ == "__main__":

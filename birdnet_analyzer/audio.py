@@ -12,7 +12,17 @@ import birdnet_analyzer.config as cfg
 RANDOM = np.random.RandomState(cfg.RANDOM_SEED)
 
 
-def open_audio_file(path: str, sample_rate=48000, offset=0.0, duration=None, fmin=None, fmax=None, speed=1.0, sig_fmin=0, sig_fmax=15000):
+def open_audio_file(
+    path: str,
+    sample_rate=48000,
+    offset=0.0,
+    duration=None,
+    fmin=None,
+    fmax=None,
+    speed=1.0,
+    sig_fmin=0,
+    sig_fmax=15000,
+):
     """Open an audio file.
 
     Opens an audio file with librosa and the given settings.
@@ -33,14 +43,28 @@ def open_audio_file(path: str, sample_rate=48000, offset=0.0, duration=None, fmi
     """
     # Open file with librosa (uses ffmpeg or libav)
     if speed == 1.0:
-        sig, rate = librosa.load(path, sr=sample_rate, offset=offset, duration=duration, mono=True, res_type="kaiser_fast")
+        sig, rate = librosa.load(
+            path,
+            sr=sample_rate,
+            offset=offset,
+            duration=duration,
+            mono=True,
+            res_type="kaiser_fast",
+        )
 
     else:
         # Load audio with original sample rate
-        sig, rate = librosa.load(path, sr=None, offset=offset, duration=duration, mono=True)
+        sig, rate = librosa.load(
+            path, sr=None, offset=offset, duration=duration, mono=True
+        )
 
         # Resample with "fake" sample rate
-        sig = librosa.resample(sig, orig_sr=int(rate * speed), target_sr=sample_rate, res_type="kaiser_fast")
+        sig = librosa.resample(
+            sig,
+            orig_sr=int(rate * speed),
+            target_sr=sample_rate,
+            res_type="kaiser_fast",
+        )
         rate = sample_rate
 
     # Bandpass filter
@@ -59,7 +83,8 @@ def get_audio_info(path):
         path (str): The file path to the audio file.
 
     Returns:
-        dict: A dictionary containing audio file information such as sample rate, channels, duration, etc.
+        dict: A dictionary containing audio file information such as sample rate,
+            channels, duration, etc.
     """
     info = sf.info(path)
 
@@ -135,7 +160,9 @@ def pad(sig, seconds, srate, amount=None, use_noise=False):
 
             # Create Gaussian noise
             try:
-                noise = RANDOM.normal(min(sig) * amount, max(sig) * amount, noise_shape).astype(sig.dtype)
+                noise = RANDOM.normal(
+                    min(sig) * amount, max(sig) * amount, noise_shape
+                ).astype(sig.dtype)
             except:
                 noise = np.zeros(noise_shape, dtype=sig.dtype)
         else:
@@ -146,7 +173,15 @@ def pad(sig, seconds, srate, amount=None, use_noise=False):
     return sig
 
 
-def split_signal(sig, rate, seconds=3.0, overlap=0.0, minlen=1.0, amount=None, use_noise_for_padding=False):
+def split_signal(
+    sig,
+    rate,
+    seconds=3.0,
+    overlap=0.0,
+    minlen=1.0,
+    amount=None,
+    use_noise_for_padding=False,
+):
     """Split signal with overlap.
 
     Args:
@@ -196,7 +231,9 @@ def split_signal(sig, rate, seconds=3.0, overlap=0.0, minlen=1.0, amount=None, u
             amount = RANDOM.uniform(0.1, 0.5)
         # Create Gaussian noise
         try:
-            noise = RANDOM.normal(loc=min(sig) * amount, scale=max(sig) * amount, size=chunksize).astype(sig.dtype)
+            noise = RANDOM.normal(
+                loc=min(sig) * amount, scale=max(sig) * amount, size=chunksize
+            ).astype(sig.dtype)
         except:
             noise = np.zeros(shape=chunksize, dtype=sig.dtype)
     else:
@@ -206,7 +243,9 @@ def split_signal(sig, rate, seconds=3.0, overlap=0.0, minlen=1.0, amount=None, u
 
     # Split signal with overlap
     sig_splits = []
-    sig_splits.extend(data[i : i + chunksize] for i in range(0, lastchunkpos + 1, stepsize))
+    sig_splits.extend(
+        data[i : i + chunksize] for i in range(0, lastchunkpos + 1, stepsize)
+    )
 
     return sig_splits
 
@@ -273,11 +312,14 @@ def smart_crop_signal(sig, rate, sig_length, sig_overlap, sig_minlen):
     # Find peaks in the energy curve
     # Smooth energies first to avoid small fluctuations
     smoothed_energies = np.convolve(energies, np.ones(3) / 3, mode="same")
-    peaks, _ = find_peaks(smoothed_energies, height=np.mean(smoothed_energies), distance=2)
+    peaks, _ = find_peaks(
+        smoothed_energies, height=np.mean(smoothed_energies), distance=2
+    )
 
     # If no clear peaks found, fall back to selecting top energy segments
     if len(peaks) < 2:
-        # Sort segments by energy and take top segments (up to 3 or 1/3 of total, whichever is more)
+        # Sort segments by energy and take top segments (up to 3 or 1/3 of total,
+        # whichever is more)
         num_segments = max(3, len(splits) // 3)
         indices = np.argsort(energies)[-num_segments:]
         return [splits[i] for i in sorted(indices)]
@@ -304,8 +346,10 @@ def bandpass(sig, rate, fmin, fmax, order=5, sig_fmin=0, sig_fmax=15000):
         fmin (float): The minimum frequency for the bandpass filter.
         fmax (float): The maximum frequency for the bandpass filter.
         order (int, optional): The order of the filter. Default is 5.
-        sig_fmin (float, optional): The minimum frequency of the original signal. Default is 0.
-        sig_fmax (float, optional): The maximum frequency of the original signal. Default is 15000.
+        sig_fmin (float, optional): The minimum frequency of the original signal.
+            Default is 0.
+        sig_fmax (float, optional): The maximum frequency of the original signal.
+            Default is 15000.
 
     Returns:
         numpy.ndarray: The filtered signal as a float32 array.
@@ -345,7 +389,8 @@ def bandpass(sig, rate, fmin, fmax, order=5, sig_fmin=0, sig_fmax=15000):
 # A Kaiser window is used with a default transition bandwidth of 0.02 times
 # the Nyquist frequency and a default stop band attenuation of 100 dB.
 # For a complete description of this method, see Discrete-Time Signal Processing
-# (Second Edition), by Alan Oppenheim, Ronald Schafer, and John Buck, Prentice Hall 1998, pp. 474-476.
+# (Second Edition), by Alan Oppenheim, Ronald Schafer, and John Buck,
+# Prentice Hall 1998, pp. 474-476.
 # TODO: deprecated, but not used anywhere
 # If neeeded in the future, replace the config values with fuction arguments
 def bandpass_kaiser_fir(sig, rate, fmin, fmax, width=0.02, stopband_attenuation_db=100):
@@ -357,7 +402,8 @@ def bandpass_kaiser_fir(sig, rate, fmin, fmax, width=0.02, stopband_attenuation_
         fmin (float): The minimum frequency of the bandpass filter.
         fmax (float): The maximum frequency of the bandpass filter.
         width (float, optional): The transition width of the filter. Default is 0.02.
-        stopband_attenuation_db (float, optional): The desired attenuation in the stopband, in decibels. Default is 100.
+        stopband_attenuation_db (float, optional): The desired attenuation in the
+            stopband, in decibels. Default is 100.
     Returns:
         numpy.ndarray: The filtered signal as a float32 numpy array.
     """

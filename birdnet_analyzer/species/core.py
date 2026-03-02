@@ -19,21 +19,29 @@ def species(
     """
     Retrieves and processes species data based on the provided parameters.
     Args:
-        output (str): The output directory or file path where the results will be stored.
-        lat (float | None, optional): Latitude of the location for species filtering. Defaults to None (no filtering by location).
-        lon (float | None, optional): Longitude of the location for species filtering. Defaults to None (no filtering by location).
-        week (int | None, optional): Week of the year for species filtering. Defaults to None (no filtering by time).
-        sf_thresh (float, optional): Species frequency threshold for filtering. Defaults to 0.03.
+        output (str): The output directory or file path where the results will be
+                      stored.
+        lat (float | None, optional): Latitude of the location for species filtering.
+                                      Defaults to None (no filtering by location).
+        lon (float | None, optional): Longitude of the location for species filtering.
+                                      Defaults to None (no filtering by location).
+        week (int | None, optional): Week of the year for species filtering.
+                                     Defaults to None (no filtering by time).
+        sf_thresh (float, optional): Species frequency threshold for filtering.
+                                     Defaults to 0.03.
     Raises:
         FileNotFoundError: If the required model files are not found.
         ValueError: If invalid parameters are provided.
     Notes:
         This function ensures that the required model files exist before processing.
-        It delegates the main processing to the `run` function from `birdnet_analyzer.species.utils`.
+        It delegates the main processing to the `run` function
+        from `birdnet_analyzer.species.utils`.
     """
     from birdnet_analyzer.species.utils import get_species_list
 
-    species_list = get_species_list(-1 if lat is None else lat, -1 if lon is None else lon, week, sf_thresh, lang)
+    species_list = get_species_list(
+        -1 if lat is None else lat, -1 if lon is None else lon, week, sf_thresh, lang
+    )
 
     if os.path.isdir(output):
         output = os.path.join(output, "species_list.txt")

@@ -10,16 +10,36 @@ from birdnet_analyzer.segments.core import segments
 
 @gu.gui_runtime_error_handler
 def _extract_segments(
-    audio_dir, result_dir, output_dir, min_conf, max_conf, num_seq, audio_speed, seq_length, threads, collection_mode, num_bins, progress=gr.Progress()
+    audio_dir,
+    result_dir,
+    output_dir,
+    min_conf,
+    max_conf,
+    num_seq,
+    audio_speed,
+    seq_length,
+    threads,
+    collection_mode,
+    num_bins,
+    progress=gr.Progress(),
 ):
     gu.validate(audio_dir, loc.localize("validation-no-audio-directory-selected"))
-    gu.validate(max_conf > min_conf, loc.localize("validation-max-confidence-lower-than-min-confidence"))
+    gu.validate(
+        max_conf > min_conf,
+        loc.localize("validation-max-confidence-lower-than-min-confidence"),
+    )
 
     if progress is not None:
-        progress(0, desc=f"{loc.localize('progress-search')} ...")  # TODO: correct localization?
+        progress(
+            0, desc=f"{loc.localize('progress-search')} ..."
+        )  # TODO: correct localization?
 
     def on_update(info):
-        progress(info[0], total=info[1], desc=f"{loc.localize('progress-extracting-segments')} ...")
+        progress(
+            info[0],
+            total=info[1],
+            desc=f"{loc.localize('progress-extracting-segments')} ...",
+        )
 
     segments_list = segments(
         audio_dir,
@@ -36,14 +56,20 @@ def _extract_segments(
         on_update=on_update if progress else None,
     )
 
-    skipped_files = [[os.path.relpath(r[0], audio_dir)] for r in segments_list if not r[1]]
+    skipped_files = [
+        [os.path.relpath(r[0], audio_dir)] for r in segments_list if not r[1]
+    ]
     header = (
         [loc.localize("multi-tab-result-dataframe-column-invalid-file-header")]
         if skipped_files
         else [loc.localize("segments-tab-result-dataframe-column-success-header")]
     )
 
-    return gr.update(value=skipped_files, headers=header, elem_classes=None if not skipped_files else "success")
+    return gr.update(
+        value=skipped_files,
+        headers=header,
+        elem_classes=None if not skipped_files else "success",
+    )
 
 
 def build_segments_tab():
@@ -58,36 +84,54 @@ def build_segments_tab():
             return (gu.select_directory(collect_files=False, state_key=state_key),) * 2
 
         with gr.Row():
-            select_audio_directory_btn = gr.Button(loc.localize("segments-tab-select-audio-input-directory-button-label"))
-            selected_audio_directory_tb = gr.Textbox(show_label=False, interactive=False)
+            select_audio_directory_btn = gr.Button(
+                loc.localize("segments-tab-select-audio-input-directory-button-label")
+            )
+            selected_audio_directory_tb = gr.Textbox(
+                show_label=False, interactive=False
+            )
             select_audio_directory_btn.click(
-                partial(select_directory_to_state_and_tb, state_key="segments-audio-dir"),
+                partial(
+                    select_directory_to_state_and_tb, state_key="segments-audio-dir"
+                ),
                 outputs=[selected_audio_directory_tb, audio_directory_state],
                 show_progress="hidden",
             )
 
         with gr.Row():
-            select_result_directory_btn = gr.Button(loc.localize("segments-tab-select-results-input-directory-button-label"))
+            select_result_directory_btn = gr.Button(
+                loc.localize("segments-tab-select-results-input-directory-button-label")
+            )
             selected_result_directory_tb = gr.Textbox(
                 show_label=False,
                 interactive=False,
-                placeholder=loc.localize("segments-tab-results-input-textbox-placeholder"),
+                placeholder=loc.localize(
+                    "segments-tab-results-input-textbox-placeholder"
+                ),
             )
             select_result_directory_btn.click(
-                partial(select_directory_to_state_and_tb, state_key="segments-result-dir"),
+                partial(
+                    select_directory_to_state_and_tb, state_key="segments-result-dir"
+                ),
                 outputs=[result_directory_state, selected_result_directory_tb],
                 show_progress="hidden",
             )
 
         with gr.Row():
-            select_output_directory_btn = gr.Button(loc.localize("segments-tab-output-selection-button-label"))
+            select_output_directory_btn = gr.Button(
+                loc.localize("segments-tab-output-selection-button-label")
+            )
             selected_output_directory_tb = gr.Textbox(
                 show_label=False,
                 interactive=False,
-                placeholder=loc.localize("segments-tab-output-selection-textbox-placeholder"),
+                placeholder=loc.localize(
+                    "segments-tab-output-selection-textbox-placeholder"
+                ),
             )
             select_output_directory_btn.click(
-                partial(select_directory_to_state_and_tb, state_key="segments-output-dir"),
+                partial(
+                    select_directory_to_state_and_tb, state_key="segments-output-dir"
+                ),
                 outputs=[selected_output_directory_tb, output_directory_state],
                 show_progress="hidden",
             )
@@ -114,9 +158,24 @@ def build_segments_tab():
             with gr.Row():
                 collection_mode_radio = gr.Radio(
                     choices=[
-                        (loc.localize("segments-tab-collection-mode-radio-option-random"), "random"),
-                        (loc.localize("segments-tab-collection-mode-radio-option-confidence"), "confidence"),
-                        (loc.localize("segments-tab-collection-mode-radio-option-balanced"), "balanced"),
+                        (
+                            loc.localize(
+                                "segments-tab-collection-mode-radio-option-random"
+                            ),
+                            "random",
+                        ),
+                        (
+                            loc.localize(
+                                "segments-tab-collection-mode-radio-option-confidence"
+                            ),
+                            "confidence",
+                        ),
+                        (
+                            loc.localize(
+                                "segments-tab-collection-mode-radio-option-balanced"
+                            ),
+                            "balanced",
+                        ),
                     ],
                     value="random",
                     label=loc.localize("segments-tab-collection-mode-label"),
@@ -160,7 +219,9 @@ def build_segments_tab():
                 minimum=1,
             )
 
-        extract_segments_btn = gr.Button(loc.localize("segments-tab-extract-button-label"), variant="huggingface")
+        extract_segments_btn = gr.Button(
+            loc.localize("segments-tab-extract-button-label"), variant="huggingface"
+        )
         result_grid = gr.Matrix(headers=[""], col_count=1)
 
         extract_segments_btn.click(

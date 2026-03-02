@@ -41,8 +41,23 @@ ASCII_LOGO = r"""
 
 def store_model_action(model_name: str):
     class StoreModelAction(argparse.Action):
-        def __init__(self, option_strings, dest, default=False, required=False, help=None):  # noqa: A002
-            super().__init__(option_strings=option_strings, dest=dest, nargs=0, const=True, default=default, required=required, help=help)
+        def __init__(
+            self,
+            option_strings,
+            dest,
+            default=False,
+            required=False,
+            help=None,  # noqa: A002
+        ):
+            super().__init__(
+                option_strings=option_strings,
+                dest=dest,
+                nargs=0,
+                const=True,
+                default=default,
+                required=required,
+                help=help,
+            )
 
         def __call__(self, parser, namespace, values, option_string=None):
             setattr(namespace, self.dest, True)
@@ -92,7 +107,9 @@ def io_args():
         metavar="INPUT",
         help="Path to input file or folder.",
     )
-    p.add_argument("-o", "--output", help="Path to output folder. Defaults to the input path.")
+    p.add_argument(
+        "-o", "--output", help="Path to output folder. Defaults to the input path."
+    )
 
     return p
 
@@ -466,8 +483,16 @@ def analyzer_parser():
         default=1,
         help="Maximum number of consecutive detections above MIN_CONF to merge for each detected species. This will result in fewer entires in the result file with segments longer than 3 seconds. Set to 0 or 1 to disable merging. Set to None to include all consecutive detections. We use the mean of the top 3 scores from all consecutive detections for merging.",
     )
-    parser.add_argument("--use_perch", action=store_model_action("perch"), help="Use the Perch model for detection.")
-    parser.add_argument("--split_tables", action="store_true", help="Saves separate result tables for each input audio file in the output.")
+    parser.add_argument(
+        "--use_perch",
+        action=store_model_action("perch"),
+        help="Use the Perch model for detection.",
+    )
+    parser.add_argument(
+        "--split_tables",
+        action="store_true",
+        help="Saves separate result tables for each input audio file in the output.",
+    )
     parser.set_defaults(model="birdnet")
 
     return parser
@@ -489,7 +514,14 @@ def embeddings_parser():
         argparse.ArgumentParser: Configured argument parser for extracting feature embeddings.
     """
 
-    parents = [db_args(), bandpass_args(), audio_speed_args(), overlap_args(), bs_args(default=8), computing_resources_args()]
+    parents = [
+        db_args(),
+        bandpass_args(),
+        audio_speed_args(),
+        overlap_args(),
+        bs_args(default=8),
+        computing_resources_args(),
+    ]
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         parents=parents,
@@ -502,7 +534,10 @@ def embeddings_parser():
         help="Path to input file or folder, relative to the audio root.",
     )
 
-    parser.add_argument("--file_output", help="Saves all embeddings contained in the database in a csv file.")
+    parser.add_argument(
+        "--file_output",
+        help="Saves all embeddings contained in the database in a csv file.",
+    )
 
     return parser
 
@@ -524,11 +559,15 @@ def search_parser():
     """
 
     parents = [overlap_args(), db_args()]
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, parents=parents)
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter, parents=parents
+    )
 
     parser.add_argument("-q", "--queryfile", help="Path to the query file.")
     parser.add_argument("-o", "--output", help="Path to the output folder.")
-    parser.add_argument("--n_results", default=10, type=int, help="Number of results to return.")
+    parser.add_argument(
+        "--n_results", default=10, type=int, help="Number of results to return."
+    )
 
     # TODO: use choice argument.
     parser.add_argument(
@@ -574,10 +613,20 @@ def client_parser():
         parents=[io_args(), species_args(), sigmoid_args(), overlap_args()],
     )
 
-    parser.add_argument("--host", default="localhost", help="Host name or IP address of API endpoint server.")
-    parser.add_argument("-p", "--port", type=int, default=8080, help="Port of API endpoint server.")
-    parser.add_argument("--pmode", default="avg", help="Score pooling mode. Values in ['avg', 'max'].")
-    parser.add_argument("--num_results", type=int, default=5, help="Number of results per request.")
+    parser.add_argument(
+        "--host",
+        default="localhost",
+        help="Host name or IP address of API endpoint server.",
+    )
+    parser.add_argument(
+        "-p", "--port", type=int, default=8080, help="Port of API endpoint server."
+    )
+    parser.add_argument(
+        "--pmode", default="avg", help="Score pooling mode. Values in ['avg', 'max']."
+    )
+    parser.add_argument(
+        "--num_results", type=int, default=5, help="Number of results per request."
+    )
     parser.add_argument(
         "--save",
         action="store_true",
@@ -603,9 +652,19 @@ def segments_parser():
         parents=[audio_speed_args(), threads_args(), min_conf_args()],
     )
 
-    parser.add_argument("audio_input", metavar="INPUT", help="Path to folder containing audio files.")
-    parser.add_argument("-r", "--results", help="Path to folder containing result files. Defaults to the `input` path.")
-    parser.add_argument("-o", "--output", help="Output folder path for extracted segments. Defaults to the `input` path.")
+    parser.add_argument(
+        "audio_input", metavar="INPUT", help="Path to folder containing audio files."
+    )
+    parser.add_argument(
+        "-r",
+        "--results",
+        help="Path to folder containing result files. Defaults to the `input` path.",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="Output folder path for extracted segments. Defaults to the `input` path.",
+    )
     parser.add_argument(
         "--max_segments",
         type=lambda a: max(1, int(a)),
@@ -653,11 +712,19 @@ def server_parser():
         parents=[threads_args(), locale_args()],
     )
 
-    parser.add_argument("--host", default="0.0.0.0", help="Host name or IP address of API endpoint server.")
-    parser.add_argument("-p", "--port", type=int, default=8080, help="Port of API endpoint server.")
+    parser.add_argument(
+        "--host",
+        default="0.0.0.0",
+        help="Host name or IP address of API endpoint server.",
+    )
+    parser.add_argument(
+        "-p", "--port", type=int, default=8080, help="Port of API endpoint server."
+    )
     parser.add_argument(
         "--spath",
-        default="uploads/" if os.environ.get("IS_GITHUB_RUNNER", "false").lower() == "true" else os.path.join(SCRIPT_DIR, "uploads"),
+        default="uploads/"
+        if os.environ.get("IS_GITHUB_RUNNER", "false").lower() == "true"
+        else os.path.join(SCRIPT_DIR, "uploads"),
         help="Path to folder where uploaded files should be stored.",
     )
 
@@ -710,7 +777,9 @@ def train_parser():
             audio_speed_args(),
             threads_args(),
             bs_args(32),
-            overlap_args(help_string="Overlap of training data segments in seconds if crop_mode is 'segments'."),
+            overlap_args(
+                help_string="Overlap of training data segments in seconds if crop_mode is 'segments'."
+            ),
         ],
     )
     c = (
@@ -722,16 +791,21 @@ def train_parser():
     parser.add_argument(
         "audio_input",
         metavar="INPUT",
-        help="Path to training data folder. Subfolder names are used as labels.",
+        help="Path to training data folder. Subfolder names are used as labels. Can also be path to cache file",
     )
-    parser.add_argument("--test_data", help="Path to test data folder. If not specified, a random validation split will be used.")
+    parser.add_argument(
+        "--test_data",
+        help="Path to test data folder. If not specified, a random validation split will be used.",
+    )
     parser.add_argument(
         "--crop_mode",
         default="center",
         choices=["center", "first", "segments", "smart"],
         help="Crop mode for training data. Can be 'center', 'first', 'segments' or 'smart'.",
     )
-    parser.add_argument("-o", "--output", default=c, help="Path to trained classifier model output.")
+    parser.add_argument(
+        "-o", "--output", default=c, help="Path to trained classifier model output."
+    )
     parser.add_argument(
         "--epochs",
         type=int,
@@ -780,8 +854,14 @@ def train_parser():
         default=0.0,
         help="Dropout rate. Higher values result in more regularization. Values in [0.0, 0.9].",
     )
-    parser.add_argument("--label_smoothing", action="store_true", help="Whether to use label smoothing for training.")
-    parser.add_argument("--mixup", action="store_true", help="Whether to use mixup for training.")
+    parser.add_argument(
+        "--label_smoothing",
+        action="store_true",
+        help="Whether to use label smoothing for training.",
+    )
+    parser.add_argument(
+        "--mixup", action="store_true", help="Whether to use mixup for training."
+    )
     parser.add_argument(
         "--upsampling_ratio",
         type=lambda a: min(max(0, float(a)), 1),
@@ -806,8 +886,9 @@ def train_parser():
         choices=["replace", "append"],
         help="Model save mode. 'replace' will overwrite the original classification layer and 'append' will combine the original classification layer with the new one.",
     )
-    parser.add_argument("--cache_mode", choices=["load", "save"], help="Cache mode. Can be 'load' or 'save'.")
-    parser.add_argument("--cache_file", default="train_cache.npz", help="Path to cache file.")
+    parser.add_argument(
+        "--save_cache_to", default="train_cache.npz", help="Path to cache file."
+    )
     parser.add_argument(
         "--autotune",
         action="store_true",

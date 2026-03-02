@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import pathlib
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -80,10 +81,12 @@ def embeddings(
         callback=on_update,
     )
 
+    audio_root = str(pathlib.Path(audio_input).parent)
+
     batchsize = COMMIT_BS_SIZE
     pending_since_commit = 0
     db = _get_or_create_database(database)
-    _check_database_settings(db, fmin=fmin, fmax=fmax, audio_speed=audio_speed)
+    _check_database_settings(db, fmin=fmin, fmax=fmax, audio_speed=audio_speed, audio_root=audio_root)
     deployment_id = _ensure_deployment(db)
 
     # Iterate over files and segments in the encoding result.
@@ -97,7 +100,7 @@ def embeddings(
     input_durations = result.input_durations
 
     for i in tqdm(range(n_inputs), desc="Saving embeddings to database", total=n_inputs):
-        fpath = str(result.inputs[i])
+        fpath = str(pathlib.Path(result.inputs[i]).relative_to(audio_root))
         file_dur = float(input_durations[i])
         recording_id = _ensure_recording(db, fpath, deployment_id)
         windows_batch = []
@@ -221,7 +224,7 @@ def _get_or_create_database(db_path: str, embedding_dim: int = 1024):
         return sqlite_usearch_impl.SQLiteUSearchDB.create(db_path=db_path, usearch_cfg=sqlite_usearch_impl.get_default_usearch_config(embedding_dim=embedding_dim))
 
 
-def _check_database_settings(db: sqlite_usearch_impl.SQLiteUSearchDB, fmin: int = 0, fmax: int = 15000, audio_speed: float = 1.0):
+def _check_database_settings(db: sqlite_usearch_impl.SQLiteUSearchDB, fmin: int = 0, fmax: int = 15000, audio_speed: float = 1.0, audio_root: str = None):
     from ml_collections import ConfigDict
 
     from birdnet_analyzer.embeddings.core import SETTINGS_KEY
@@ -229,13 +232,16 @@ def _check_database_settings(db: sqlite_usearch_impl.SQLiteUSearchDB, fmin: int 
     try:
         settings = db.get_metadata(SETTINGS_KEY)
 
-        if settings["BANDPASS_FMIN"] != fmin or settings["BANDPASS_FMAX"] != fmax or settings["AUDIO_SPEED"] != audio_speed:
+        if settings["BANDPASS_FMIN"] != fmin or \
+        settings["BANDPASS_FMAX"] != fmax or \
+        settings["AUDIO_SPEED"] != audio_speed or \
+        settings.get("AUDIO_ROOT") != audio_root:
             raise ValueError(
                 "Database settings do not match current configuration. DB Settings are: fmin:"
-                + f"{settings['BANDPASS_FMIN']}, fmax: {settings['BANDPASS_FMAX']}, audio_speed: {settings['AUDIO_SPEED']}"
+                + f"{settings['BANDPASS_FMIN']}, fmax: {settings['BANDPASS_FMAX']}, audio_speed: {settings['AUDIO_SPEED']}, audio_root: {settings.get('AUDIO_ROOT')}"
             )
     except KeyError:
-        settings = ConfigDict({"BANDPASS_FMIN": fmin, "BANDPASS_FMAX": fmax, "AUDIO_SPEED": audio_speed})
+        settings = ConfigDict({"BANDPASS_FMIN": fmin, "BANDPASS_FMAX": fmax, "AUDIO_SPEED": audio_speed, "AUDIO_ROOT": audio_root})
 
         db.insert_metadata(SETTINGS_KEY, settings)
         db.commit()

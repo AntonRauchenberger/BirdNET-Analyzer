@@ -20,7 +20,6 @@ SETTINGS_KEY = "birdnet_analyzer_settings"
 
 def embeddings(
     audio_input: str,
-    audio_root: str,
     database: str,
     *,
     overlap: float = 0.0,
@@ -40,7 +39,6 @@ def embeddings(
     further analysis or comparison.
     Args:
         audio_input (str): Path to the input audio file or directory containing audio files.
-        audio_root (str): Root path for audio input files.
         database (str): Path to the database where embeddings will be stored.
         overlap (float, optional): Overlap between consecutive audio segments in seconds. Defaults to 0.0.
         audio_speed (float, optional): Speed factor for audio processing. Defaults to 1.0.
@@ -69,10 +67,8 @@ def embeddings(
     """
     from birdnet_analyzer.model_utils import get_embeddings
 
-    final_audio_input = os.path.join(audio_root, audio_input)
-
     result = get_embeddings(
-        final_audio_input,
+        audio_input,
         version="2.4",
         batch_size=batch_size,
         overlap_duration_s=overlap,
@@ -83,6 +79,8 @@ def embeddings(
         n_producers=n_producers,
         callback=on_update,
     )
+
+    audio_root = str(pathlib.Path(audio_input).parent)
 
     batchsize = COMMIT_BS_SIZE
     pending_since_commit = 0

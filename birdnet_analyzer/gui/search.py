@@ -55,16 +55,19 @@ def update_export_state(audio_infos, checkbox_value, export_state: dict):
 
 
 @gu.gui_runtime_error_handler
-def run_search(db_path, query_path, max_samples, score_fn, crop_mode, crop_overlap):
+def run_search(db_path, audio_root, query_path, max_samples, score_fn, crop_mode, crop_overlap):
     from birdnet_analyzer.embeddings.core import SETTINGS_KEY
     from birdnet_analyzer.search.utils import get_search_results
 
     gu.validate(db_path, loc.localize("embeddings-search-db-validation-message"))
+    gu.validate(audio_root, loc.localize("embeddings-search-audio-root-validation-message"))
     gu.validate(query_path, loc.localize("embeddings-search-query-validation-message"))
     gu.validate(max_samples, loc.localize("embeddings-search-max-samples-validation-message"))
 
     db = get_search_database(db_path)
     settings = db.get_metadata(SETTINGS_KEY)
+    settings["AUDIO_ROOT"] = audio_root
+    db.insert_metadata(SETTINGS_KEY, settings)
 
     results = get_search_results(
         query_path,
@@ -121,6 +124,16 @@ def build_search_tab():
                             visible=False,
                             label=loc.localize("embeddings-search-db-audio-speed-number-label"),
                         )
+                with gr.Row():
+                    audio_root_selection_button = gr.Button(loc.localize("embeddings-search-audio-root-selection-button-label"))
+                with gr.Row():
+                    audio_root_selection_tb = gr.Textbox(
+                        label=loc.localize("embeddings-search-audio-root-selection-textbox-label"),
+                        max_lines=3,
+                        interactive=False,
+                        visible=False,
+                    )
+
                 query_spectrogram = gr.Plot(show_label=False)
                 select_query_btn = gr.Button(loc.localize("embeddings-search-select-query-button-label"))
                 query_sample_tb = gr.Textbox(
@@ -166,10 +179,10 @@ def build_search_tab():
                 with gr.Column(elem_id="embeddings-search-results"):
 
                     @gr.render(
-                        inputs=[results_state, page_state, db_selection_tb, export_state],
+                        inputs=[results_state, page_state, db_selection_tb, export_state, audio_root_selection_tb],
                         triggers=[results_state.change, page_state.change, db_selection_tb.change],
                     )
-                    def render_results(results, page, db_path, exports):
+                    def render_results(results, page, db_path, exports, audio_root):
                         with gr.Row():
                             if db_path is not None and len(results) > 0:
                                 db = get_search_database(db_path)
@@ -180,7 +193,7 @@ def build_search_tab():
                                         index = i + page * PAGE_SIZE
                                         window = db.get_window(r.window_id)
                                         recording = db.get_recording(window.recording_id)
-                                        file = recording.filename
+                                        file = os.path.join(audio_root, recording.filename)
                                         offset = window.offsets[0]
                                         duration = 3.0 * settings["AUDIO_SPEED"]  # type: ignore
                                         spec = utils.spectrogram_from_file(
@@ -236,6 +249,25 @@ def build_search_tab():
     def on_db_selection_click():
         folder = gu.select_folder(state_key="embeddings_search_db")
 
+        error_result = (
+                gr.Textbox(visible=False),
+                gr.Textbox(),
+                gr.Textbox(visible=False),
+                gr.Textbox(visible=False),
+                gr.Textbox(visible=False),
+                [],
+                {},
+                gr.Button(visible=False),
+                gr.Textbox(visible=False)
+            )
+
+        if not folder:
+            return error_result
+
+        if not os.path.exists(os.path.join(folder, "hoplite.sqlite")):
+            raise gr.Error(loc.localize("embeddings-search-db-selection-error"))
+            return error_result
+
         try:
             db = get_embeddings_database(folder)
         except ValueError as e:
@@ -245,21 +277,29 @@ def build_search_tab():
         settings = db.get_metadata(SETTINGS_KEY)
         frequencies = f"{settings['BANDPASS_FMIN']} - {settings['BANDPASS_FMAX']} Hz"
         speed: float = settings["AUDIO_SPEED"]
+        audio_root = settings["AUDIO_ROOT"]
         db.db.close()
 
-        if folder:
-            return (
-                gr.Textbox(value=folder, visible=True),
-                gr.Number(value=embedding_count, visible=True),
-                gr.Textbox(visible=True, value=frequencies),
-                gr.Number(visible=True, value=speed),
-                [],
-                {},
-                gr.Button(visible=True),
-                gr.Textbox(value=None, visible=True),
-            )
+        return (
+            gr.Textbox(value=folder, visible=True),
+            gr.Textbox(value=audio_root, visible=True),
+            gr.Number(value=embedding_count, visible=True),
+            gr.Textbox(visible=True, value=frequencies),
+            gr.Number(visible=True, value=speed),
+            [],
+            {},
+            gr.Button(visible=True),
+            gr.Textbox(value=None, visible=True),
+        )
 
-        return None, None, None, None, [], {}, gr.Button(visible=False), gr.Textbox(visible=False)
+
+    def on_audio_root_selection_click():
+        folder = gu.select_folder(state_key="embeddings_search_audio_root")
+
+        if folder:
+            return gr.Textbox(value=folder, visible=True)
+
+        return gr.Textbox(visible=False)
 
     def select_query_sample():
         file = gu.select_file(state_key="query_sample")
@@ -322,6 +362,7 @@ def build_search_tab():
         on_db_selection_click,
         outputs=[
             db_selection_tb,
+            audio_root_selection_tb,
             db_embedding_count_number,
             db_bandpass_frequencies_tb,
             db_audio_speed_number,
@@ -333,10 +374,19 @@ def build_search_tab():
         show_progress="hidden",
     )
 
+    audio_root_selection_button.click(
+        on_audio_root_selection_click,
+        outputs=[
+            audio_root_selection_tb,
+        ],
+        show_progress="hidden",
+    )
+
     search_btn.click(
         run_search,
         inputs=[
             db_selection_tb,
+            audio_root_selection_tb,
             query_sample_tb,
             max_samples_number,
             score_fn_select,

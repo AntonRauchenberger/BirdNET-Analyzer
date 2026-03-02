@@ -496,12 +496,7 @@ def embeddings_parser():
         dest="audio_input",
         help="Path to input file or folder, relative to the audio root.",
     )
-    parser.add_argument(
-        "-r",
-        "--audio_root",
-        dest="audio_root",
-        help="Path to the root directory of audio files.",
-    )
+
     parser.add_argument("--file_output", help="Saves all embeddings contained in the database in a csv file.")
 
     return parser

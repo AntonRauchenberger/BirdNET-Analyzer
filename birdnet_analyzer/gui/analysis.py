@@ -122,7 +122,7 @@ def run_analysis(
 
     return analyze(
         audio_input=input_dir or input_path,  # type: ignore
-        min_conf=confidence,
+        min_conf=confidence if not use_top_n else 0, # workaround while lib is not ignoring confidence with top_n
         sensitivity=sensitivity,
         locale=locale,
         overlap=overlap,

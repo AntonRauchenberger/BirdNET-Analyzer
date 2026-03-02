@@ -80,7 +80,7 @@ def run_inference(
         n_workers=n_workers,
         # n_producers=n_producers, # 0.2.13
         n_feeders=n_producers,
-        apply_sigmoid=False,
+        apply_sigmoid=True,
     )
 
 

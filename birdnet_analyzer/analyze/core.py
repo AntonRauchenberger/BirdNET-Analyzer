@@ -9,8 +9,11 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Collection, Sequence
 
     import pandas as pd
-    from birdnet.acoustic.inference.core.perf_tracker import AcousticProgressStats
-    from birdnet.acoustic.inference.core.prediction.prediction_result import AcousticResultBase
+
+    # from birdnet.acoustic.inference.core.perf_tracker import AcousticProgressStats # 0.2.13
+    # from birdnet.acoustic.inference.core.prediction.prediction_result import AcousticResultBase # 0.2.13
+    from birdnet.acoustic_models.inference.perf_tracker import AcousticProgressStats
+    from birdnet.acoustic_models.inference.prediction.result import AcousticResultBase
     from birdnet.globals import ACOUSTIC_MODEL_VERSIONS, MODEL_LANGUAGES
 
     from birdnet_analyzer.config import ADDITIONAL_COLUMNS, RESULT_TYPES
@@ -124,7 +127,14 @@ def analyze(
 
     audio_input_path: Path = Path(audio_input)
     df = predictions.to_dataframe()
-    df = _merge_consecutive_segments(df, merge_consecutive, hop_size=predictions.hop_duration_s)
+    # df = _merge_consecutive_segments(df, merge_consecutive, hop_size=predictions.hop_duration_s) # 0.2.13
+    df = _merge_consecutive_segments(df, merge_consecutive, hop_size=3.0)
+
+    if not output:
+        if os.path.isfile(audio_input):
+            output = os.path.dirname(audio_input)
+        else:
+            output = audio_input
 
     if split_tables:
         output: Path = audio_input_path.parent if audio_input_path.is_file() else audio_input_path
@@ -173,7 +183,7 @@ def analyze(
 
     if save_params:
         save_params_to_file(
-            output / cfg.ANALYSIS_PARAMS_FILENAME,
+            Path(output) / cfg.ANALYSIS_PARAMS_FILENAME,
             (
                 "Segment length",
                 "Sample rate",

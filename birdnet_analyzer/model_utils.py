@@ -61,7 +61,7 @@ def run_inference(
     elif model == "birdnet":
         model = birdnet.load("acoustic", version, "tf", lang=label_language)
     elif model == "perch":
-        model = birdnet.load_perch_v2()
+        model = birdnet.load_perch_v2("CPU")
 
     return model.predict(
         path,

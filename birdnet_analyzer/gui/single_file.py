@@ -329,7 +329,7 @@ def build_single_analysis_tab():
                         prediction_state["fmax"],
                         prediction_state["predictions"].model_fmin,
                         prediction_state["predictions"].model_fmax,
-                        prediction_state["audio_speed"],
+                        prediction_state["predictions"].speed,
                         Path(file_location),
                     )
 

@@ -2,6 +2,14 @@ from collections.abc import Callable
 from typing import Literal
 
 
+def _extract_segments_wrapper(entry, output, seg_length, audio_speed):
+    from birdnet_analyzer.segments.utils import extract_segments
+
+    return extract_segments(
+        entry[0], output, seg_length, entry[1], audio_speed=audio_speed
+    )
+
+
 def segments(
     audio_input: str,
     output: str | None = None,
@@ -88,14 +96,17 @@ def segments(
                 )
             )
     else:
+        import functools
 
-        def wrapper(entry):
-            return extract_segments(
-                entry[0], output, seg_length, entry[1], audio_speed=audio_speed
-            )
+        bound_wrapper = functools.partial(
+            _extract_segments_wrapper,
+            output=output,
+            seg_length=seg_length,
+            audio_speed=audio_speed,
+        )
 
         with concurrent.futures.ProcessPoolExecutor(max_workers=threads) as executor:
-            futures = (executor.submit(wrapper, arg) for arg in file_list)
+            futures = (executor.submit(bound_wrapper, arg) for arg in file_list)
 
             for i, f in enumerate(concurrent.futures.as_completed(futures), start=1):
                 if on_update is not None:

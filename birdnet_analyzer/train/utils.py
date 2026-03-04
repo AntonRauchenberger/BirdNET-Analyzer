@@ -180,7 +180,7 @@ def _load_training_data(
 
         raise FileNotFoundError(f"Cache file not found: {audio_input}")
 
-    train_folders = utils.list_subdirectories(audio_input)
+    train_folders = list(utils.list_subdirectories(audio_input))
     labels: list[str] = []
 
     for folder in train_folders:

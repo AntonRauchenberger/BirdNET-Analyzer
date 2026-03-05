@@ -13,14 +13,23 @@ keywords = ["birdnet", "birdnet-analyzer"]
 readme = "README.md"
 requires-python = ">=3.11"
 classifiers = [
+    "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Operating System :: OS Independent",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: POSIX :: BSD",
+    "Operating System :: Unix",
     "Topic :: Multimedia :: Sound/Audio :: Analysis",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Information Analysis",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: MIT License",
 ]
 dependencies = [
     "librosa>=0.11",
@@ -30,7 +39,6 @@ dependencies = [
     "tqdm",
     "pandas",
     "matplotlib",
-    "kagglehub",
     "birdnet>=0.2.11",                           # 0.2.13
 ]
 

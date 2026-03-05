@@ -113,6 +113,7 @@ def run_analysis(
         if audio_speed < 0
         else max(1.0, float(audio_speed))
     )
+    on_update = partial(on_progress, progress=progress) if callable(progress) else None
 
     if selected_model == gu._CUSTOM_CLASSIFIER and custom_classifier_file is None:
         raise gr.Error(loc.localize("validation-no-custom-classifier-selected"))
@@ -122,7 +123,8 @@ def run_analysis(
 
     return analyze(
         audio_input=input_dir or input_path,  # type: ignore
-        min_conf=confidence if not use_top_n else 0, # workaround while lib is not ignoring confidence with top_n
+        # TODO: workaround while lib is not ignoring confidence with top_n
+        min_conf=confidence if not use_top_n else 0,
         sensitivity=sensitivity,
         locale=locale,
         overlap=overlap,
@@ -144,9 +146,7 @@ def run_analysis(
         birdnet="2.4",
         classifier=custom_classifier,
         cc_species_list=None,  # always default search path in GUI currently
-        on_update=partial(on_progress, progress=progress)
-        if callable(progress)
-        else None,
+        on_update=on_update,
         save_params=save_params,
         n_producers=n_producers,
         n_workers=n_workers,

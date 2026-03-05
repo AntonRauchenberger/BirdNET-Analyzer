@@ -90,6 +90,7 @@ def run_single_file_analysis(
 
     table = predictions.to_dataframe()
     n_rows = table.shape[0]
+
     if n_rows > 0:
         table[[HEADER_SCI_NAME_LBL, HEADER_COMMON_NAME_LBL]] = table[
             "species_name"
@@ -185,7 +186,7 @@ def build_single_analysis_tab():
             segment_audio = gr.Audio(
                 autoplay=True,
                 type="numpy",
-                show_download_button=True,
+                buttons=["download"],
                 show_label=False,
                 editable=False,
                 visible=False,

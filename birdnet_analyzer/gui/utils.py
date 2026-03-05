@@ -313,7 +313,7 @@ def build_settings():
             ),
             interactive=False,
             placeholder=loc.localize("settings-tab-error-log-textbox-placeholder"),
-            show_copy_button=True,
+            buttons=["copy"],
         )
 
         def on_language_change(value):
@@ -1050,7 +1050,6 @@ def open_window(builder: list[Callable] | Callable):
     _URL = demo.queue(api_open=False).launch(
         prevent_thread_lock=True,
         quiet=True,
-        show_api=False,
         enable_monitoring=False,
         allowed_paths=_get_win_drives() if sys.platform == "win32" else ["/"],
     )[1]
@@ -1083,4 +1082,4 @@ def open_window(builder: list[Callable] | Callable):
             ctypes.sizeof(wintypes.BOOL),
         )
 
-    webview.start(private_mode=False)
+    webview.start(private_mode=False, debug=True)

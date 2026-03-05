@@ -458,7 +458,7 @@ def save_as_rtable(
     df[["Scientific Name", "Common Name"]] = df["species_name"].str.split(
         "_", n=1, expand=True
     )
-    df["Species Code"] = df["Scientific Name"].map(lambda x: codes.get(str(x), str(x)))
+    df["Species Code"] = df["species_name"].map(lambda x: codes.get(str(x), str(x)))
 
     df.rename(
         columns={

@@ -31,7 +31,7 @@ dependencies = [
     "pandas",
     "matplotlib",
     "kagglehub",
-    "birdnet>=0.2.11", # 0.2.13
+    "birdnet>=0.2.11",                           # 0.2.13
 ]
 
 [project.optional-dependencies]
@@ -39,7 +39,7 @@ train = ["keras-tuner"]
 server = ["bottle", "requests"]
 gui = [
     "birdnet-analyzer[train,embeddings]",
-    "gradio>=5.46",
+    "gradio>=6.8.0,<7.0.0",
     "pywebview>=6.0",
     "pyobjc-framework-UniformTypeIdentifiers;platform_system=='Darwin'", # macOS only, until pywebview adds it as dependency
     "plotly[express]",

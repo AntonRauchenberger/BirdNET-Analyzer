@@ -147,7 +147,7 @@ def build_embeddings_tab():
             )
             db_path_tb = gr.Textbox(
                 show_label=False,
-                show_copy_button=True,
+                buttons=["copy"],
                 interactive=False,
                 info="⚠️ " + loc.localize("embeddings-tab-dp-path-textbox-info"),
                 scale=2,
@@ -240,14 +240,17 @@ def build_embeddings_tab():
                                 dir_name,
                                 gr.Textbox(value=dir_name),
                                 gr.Slider(
-                                    value=settings["AUDIO_SPEED"], interactive=False
-                                ),  # type: ignore
+                                    value=settings["AUDIO_SPEED"],  # type: ignore
+                                    interactive=False,
+                                ),
                                 gr.Number(
-                                    value=settings["BANDPASS_FMIN"], interactive=False
-                                ),  # type: ignore
+                                    value=settings["BANDPASS_FMIN"],  # type: ignore
+                                    interactive=False,
+                                ),
                                 gr.Number(
-                                    value=settings["BANDPASS_FMAX"], interactive=False
-                                ),  # type: ignore
+                                    value=settings["BANDPASS_FMAX"],  # type: ignore
+                                    interactive=False,
+                                ),
                                 gr.update(visible=True),
                             )
                         except KeyError:

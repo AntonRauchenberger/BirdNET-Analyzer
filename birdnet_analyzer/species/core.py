@@ -14,7 +14,7 @@ def species(
     lon: float | None = None,
     week: int | None = None,
     sf_thresh: float = 0.03,
-    lang: MODEL_LANGUAGES = "en_us",
+    locale: MODEL_LANGUAGES = "en_us",
 ):
     """
     Retrieves and processes species data based on the provided parameters.
@@ -29,6 +29,7 @@ def species(
                                      Defaults to None (no filtering by time).
         sf_thresh (float, optional): Species frequency threshold for filtering.
                                      Defaults to 0.03.
+        locale (MODEL_LANGUAGES, optional): Locale for species names. Defaults to "en_us".
     Raises:
         FileNotFoundError: If the required model files are not found.
         ValueError: If invalid parameters are provided.
@@ -40,11 +41,15 @@ def species(
     from birdnet_analyzer.species.utils import get_species_list
 
     species_list = get_species_list(
-        -1 if lat is None else lat, -1 if lon is None else lon, week, sf_thresh, lang
+        lat=-1 if lat is None else lat,
+        lon=-1 if lon is None else lon,
+        week=week,
+        threshold=sf_thresh,
+        lang=locale
     )
 
     if os.path.isdir(output):
         output = os.path.join(output, "species_list.txt")
 
-    with open(output, "w") as f:
+    with open(output, "w", encoding="utf-8") as f:
         f.writelines(s + "\n" for s in species_list)

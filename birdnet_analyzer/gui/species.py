@@ -9,19 +9,19 @@ from birdnet_analyzer.gui import settings
 
 @gu.gui_runtime_error_handler
 def run_species_list(
-    out_path, filename, lat, lon, week, use_yearlong, sf_thresh, sortby
+    out_path, filename, lat, lon, week, use_yearlong, sf_thresh, locale
 ):
-    from birdnet_analyzer.species.utils import run
+    from birdnet_analyzer.species.core import species
 
     gu.validate(out_path, loc.localize("validation-no-directory-selected"))
 
-    run(
-        os.path.join(out_path, filename or "species_list.txt"),
-        lat,
-        lon,
-        -1 if use_yearlong else week,
-        sf_thresh,
-        sortby,
+    species(
+        output=os.path.join(out_path, filename or "species_list.txt"),
+        lat=lat,
+        lon=lon,
+        week=None if use_yearlong else week,
+        sf_thresh=sf_thresh,
+        locale=locale,
     )
 
     gr.Info(f"{loc.localize('species-tab-finish-info')} {out_path}")
@@ -67,15 +67,7 @@ def build_species_tab():
             map_plot,
         ) = gu.species_list_coordinates(show_map=True)
 
-        sortby = gr.Radio(
-            [
-                (loc.localize("species-tab-sort-radio-option-frequency"), "freq"),
-                (loc.localize("species-tab-sort-radio-option-alphabetically"), "alpha"),
-            ],
-            value="freq",
-            label=loc.localize("species-tab-sort-radio-label"),
-            info=loc.localize("species-tab-sort-radio-info"),
-        )
+        locale = gu.locale()
 
         start_btn = gr.Button(
             loc.localize("species-tab-start-button-label"), variant="huggingface"
@@ -90,7 +82,7 @@ def build_species_tab():
                 week_number,
                 yearlong_checkbox,
                 sf_thresh_number,
-                sortby,
+                locale,
             ],
         )
 

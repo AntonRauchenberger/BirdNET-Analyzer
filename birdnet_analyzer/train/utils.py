@@ -7,19 +7,17 @@ from __future__ import annotations
 
 import csv
 import os
-from functools import partial
-from multiprocessing.pool import Pool
 from typing import TYPE_CHECKING
 
 import numpy as np
 import tqdm
+from birdnet import load
 
 from birdnet_analyzer import audio, model, model_utils, utils
 from birdnet_analyzer.config import ALLOWED_FILETYPES, NON_EVENT_CLASSES
+from birdnet_analyzer.model_utils import GLOBAL_PREFETCH_RATIO
 
 if TYPE_CHECKING:
-    from multiprocessing.pool import AsyncResult
-
     from birdnet_analyzer.config import (
         SAMPLE_CROP_MODES,
         TRAINED_MODEL_OUTPUT_FORMATS,
@@ -68,15 +66,17 @@ def save_sample_counts(labels, y_train, output_dir: str):
 
 def _load_audio_file(
     f,
+    session,
     label_vector,
     sample_rate=48000,
-    fmin=0.0,
-    fmax=15000.0,
+    fmin=0,
+    fmax=15000,
     audio_speed=1.0,
     crop_mode: SAMPLE_CROP_MODES = "center",
     sig_length=3.0,
     overlap=0.0,
     min_len=1.0,
+    model_sample_rate=48000,
 ):
     """Load an audio file and extract features.
     Args:
@@ -119,7 +119,9 @@ def _load_audio_file(
     for i in range(0, len(sig_splits), batch_size):
         batch_sig = sig_splits[i : i + batch_size]
         batch_label = [label_vector] * len(batch_sig)
-        embeddings = model_utils.get_embeddings_array(batch_sig)
+        embeddings = model_utils.get_embeddings_array_with_session(
+            session, [(sig, model_sample_rate) for sig in batch_sig]
+        )
 
         x_train.extend(embeddings)
         y_train.extend(batch_label)
@@ -132,8 +134,8 @@ def _load_training_data(
     test_data: str | None = None,
     upsampling_ratio: float = 0.0,
     upsampling_mode: UPSAMPLING_MODES = "repeat",
-    fmin=0.0,
-    fmax=15000.0,
+    fmin=0,
+    fmax=15000,
     audio_speed=1.0,
     crop_mode: SAMPLE_CROP_MODES = "center",
     overlap=0.0,
@@ -225,44 +227,60 @@ def _load_training_data(
         )
 
     x_train, y_train, x_test, y_test = [], [], [], []
+    model = load("acoustic", "2.4", "tf")
 
-    def load_data(data_path, allowed_folders):
-        x = []
-        y = []
-        folders = sorted(utils.list_subdirectories(data_path))
+    with model.encode_session(
+        bandpass_fmin=fmin,
+        bandpass_fmax=fmax,
+        speed=audio_speed,
+        batch_size=1,
+        n_workers=None,
+        progress_callback=None,
+        prefetch_ratio=GLOBAL_PREFETCH_RATIO,
+        n_feeders=1,
+    ) as session:
 
-        for folder in folders:
-            if folder not in allowed_folders:
-                continue
+        def load_data(data_path, allowed_folders):
+            x = []
+            y = []
+            folders = sorted(utils.list_subdirectories(data_path))
 
-            label_vector = np.zeros((len(valid_labels),), dtype="float32")
-            folder_labels = folder.split(",")
+            for folder in folders:
+                if folder not in allowed_folders:
+                    continue
 
-            for label in folder_labels:
-                if label.lower() not in NON_EVENT_CLASSES and not label.startswith("-"):
-                    label_vector[valid_labels.index(label)] = 1
-                elif label.startswith("-") and label[1:] in valid_labels:
-                    # Negative labels need to be contained in the valid labels
-                    label_vector[valid_labels.index(label[1:])] = -1
+                label_vector = np.zeros((len(valid_labels),), dtype="float32")
+                folder_labels = folder.split(",")
 
-            files = filter(
-                os.path.isfile,
-                (
-                    os.path.join(data_path, folder, f)
-                    for f in sorted(os.listdir(os.path.join(data_path, folder)))
-                    if not f.startswith(".")
-                    and f.rsplit(".", 1)[-1].lower() in ALLOWED_FILETYPES
-                ),
-            )
+                for label in folder_labels:
+                    if label.lower() not in NON_EVENT_CLASSES and not label.startswith(
+                        "-"
+                    ):
+                        label_vector[valid_labels.index(label)] = 1
+                    elif label.startswith("-") and label[1:] in valid_labels:
+                        # Negative labels need to be contained in the valid labels
+                        label_vector[valid_labels.index(label[1:])] = -1
 
-            with Pool(threads) as p:
-                tasks: list[AsyncResult] = []
+                files = list(
+                    filter(
+                        os.path.isfile,
+                        (
+                            os.path.join(data_path, folder, f)
+                            for f in sorted(os.listdir(os.path.join(data_path, folder)))
+                            if not f.startswith(".")
+                            and f.rsplit(".", 1)[-1].lower() in ALLOWED_FILETYPES
+                        ),
+                    )
+                )
 
-                for f in files:
-                    task = p.apply_async(
-                        partial(
-                            _load_audio_file,
-                            f=f,
+                num_files_processed = 0
+                with tqdm.tqdm(
+                    total=len(files), desc=f" - loading '{folder}'", unit="f"
+                ) as progress_bar:
+                    for f in files:
+                        result = _load_audio_file(
+                            f,
+                            session,
                             label_vector=label_vector,
                             fmin=fmin,
                             fmax=fmax,
@@ -270,22 +288,8 @@ def _load_training_data(
                             crop_mode=crop_mode,
                             overlap=overlap,
                             min_len=min_len,
+                            model_sample_rate=model.get_sample_rate(),
                         )
-                    )
-                    tasks.append(task)
-
-                num_files_processed = 0
-
-                with tqdm.tqdm(
-                    total=len(tasks), desc=f" - loading '{folder}'", unit="f"
-                ) as progress_bar:
-                    for task in tasks:
-                        result = task.get()
-                        # Make sure result is not empty
-                        # Empty results might be caused by errors when loading the
-                        # audio file
-                        # TODO: We should check for embeddings size in result, otherwise
-                        # we can't add them to the training data
                         if len(result[0]) > 0:
                             x += result[0]
                             y += result[1]
@@ -294,23 +298,23 @@ def _load_training_data(
                         progress_bar.update(1)
 
                         if progress_callback:
-                            progress_callback(num_files_processed, len(tasks), folder)
+                            progress_callback(num_files_processed, len(files), folder)
 
-        return np.array(x, dtype="float32"), np.array(y, dtype="float32")
+            return np.array(x, dtype="float32"), np.array(y, dtype="float32")
 
-    x_train, y_train = load_data(audio_input, train_folders)
+        x_train, y_train = load_data(audio_input, train_folders)
 
-    if test_data and test_data != audio_input:
-        test_folders = sorted(utils.list_subdirectories(test_data))
-        allowed_test_folders = [
-            folder
-            for folder in test_folders
-            if folder in train_folders and not folder.startswith("-")
-        ]
-        x_test, y_test = load_data(test_data, allowed_test_folders)
-    else:
-        x_test = np.array([])
-        y_test = np.array([])
+        if test_data and test_data != audio_input:
+            test_folders = sorted(utils.list_subdirectories(test_data))
+            allowed_test_folders = [
+                folder
+                for folder in test_folders
+                if folder in train_folders and not folder.startswith("-")
+            ]
+            x_test, y_test = load_data(test_data, allowed_test_folders)
+        else:
+            x_test = np.array([])
+            y_test = np.array([])
 
     if save_cache_to:
         try:

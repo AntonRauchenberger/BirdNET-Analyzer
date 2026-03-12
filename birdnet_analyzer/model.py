@@ -516,7 +516,7 @@ def train_linear_classifier(
     Returns:
         (classifier, history)
     """
-    setting_cache = os.environ["CUDA_VISIBLE_DEVICES"]
+    setting_cache = os.environ.get("CUDA_VISIBLE_DEVICES", "")
     os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
     class FunctionCallback(keras.callbacks.Callback):

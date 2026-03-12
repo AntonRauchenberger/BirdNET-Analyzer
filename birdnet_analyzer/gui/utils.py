@@ -873,7 +873,6 @@ def species_lists(opened=True) -> dict[_SPECIES_KEYS, gr.components.Component]:
 def download_plot(plot, filename=""):
     from PIL import Image
 
-    imgdata = base64.b64decode(plot.plot.split(",", 1)[1])
     res = _WINDOW.create_file_dialog(  # type: ignore
         webview.FileDialog.SAVE,
         file_types=("PNG (*.png)", "Webp (*.webp)", "JPG (*.jpg)"),
@@ -881,8 +880,10 @@ def download_plot(plot, filename=""):
     )
 
     if res:
+        imgdata = base64.b64decode(plot.plot.split(",", 1)[1])
+
         if isinstance(res, list | tuple):
-            res = res[0]
+            res: str = res[0]
 
         file_ext = res.split(".", 1)[-1].upper()
 
@@ -1082,4 +1083,4 @@ def open_window(builder: list[Callable] | Callable):
             ctypes.sizeof(wintypes.BOOL),
         )
 
-    webview.start(private_mode=False, debug=True)
+    webview.start(private_mode=False)

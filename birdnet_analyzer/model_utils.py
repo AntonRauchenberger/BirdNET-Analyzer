@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     import numpy as np
+    from birdnet.acoustic_models.base import AcousticModelBase
 
     # from birdnet.acoustic.inference.core.encoding.encoding_result import (
     #     AcousticFileEncodingResult,
@@ -25,9 +26,16 @@ if TYPE_CHECKING:
     from birdnet.acoustic_models.inference.prediction.result import (
         AcousticFilePredictionResult,
     )
+    from birdnet.acoustic_models.inference_pipeline.api import AcousticEncodingSession
     from birdnet.globals import ACOUSTIC_MODEL_VERSIONS, MODEL_LANGUAGES
 
 GLOBAL_PREFETCH_RATIO = 2
+
+# cache a single encode session globally. stored as a tuple
+# (model, params_dict, session_obj). when get_embeddings_array is
+# called repeatedly with identical arguments we reuse the existing
+# session to avoid reinitialising the underlying encoder.
+_CACHED_SESSION: tuple[AcousticModelBase, dict, AcousticEncodingSession] | None = None
 
 
 def run_inference(
@@ -118,6 +126,55 @@ def get_embeddings(
         # n_producers=n_producers, # 0.2.13
         n_feeders=n_producers,
     )
+
+
+def _get_cached_encode_session(
+    version: ACOUSTIC_MODEL_VERSIONS, **params
+) -> tuple[AcousticModelBase, AcousticEncodingSession]:
+    """Return a context manager for encoding.
+
+    If the ``model`` instance and ``params`` match the currently cached
+    values, the cached session is returned.  Otherwise the previous session
+    (if any) is closed and a new one created and stored.
+
+    ``params`` should exactly mirror the keyword arguments passed to
+    ``model.encode_session``.
+    """
+
+    global _CACHED_SESSION  # noqa: PLW0603
+
+    if _CACHED_SESSION is not None:
+        cached_model, cached_params, cached_session = _CACHED_SESSION
+        if params == cached_params:
+            return cached_model, cached_session
+
+        # parameters changed: try to close the old session before
+        # abandoning it. some session objects don't provide close, ignore
+        # errors.
+        try:
+            close_fn = getattr(cached_session, "__exit__", None)
+            if callable(close_fn):
+                close_fn(None, None, None)
+        except Exception:  # pragma: no cover - defensive
+            pass
+
+    # create a new session and cache it
+    model = birdnet.load("acoustic", version, "tf")
+    session = model.encode_session(**params)
+    _CACHED_SESSION = (model, params.copy(), session)
+    return model, session
+
+
+def get_embeddings_array_with_session(
+    session: AcousticEncodingSession,
+    signals: list[tuple[np.ndarray, int]],
+) -> np.ndarray:
+    result = session.run_arrays(signals)
+
+    # result.embeddings has shape (n_inputs, n_segments, embed_dim).
+    # Each input signal is a single segment, so squeeze the middle dim.
+    # Return shape: (n_inputs, embed_dim)
+    return result.embeddings[:, 0, :]
 
 
 def get_embeddings_array(

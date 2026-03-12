@@ -299,13 +299,14 @@ def build_evaluation_tab():
         current_classes,
         current_recordings,
     ):
-        if recording_duration_value.strip() == "":
+        try:
+            rec_dur = (
+                float(recording_duration_value.strip())
+                if recording_duration_value
+                else None
+            )
+        except (ValueError, TypeError):
             rec_dur = None
-        else:
-            try:
-                rec_dur = float(recording_duration_value)
-            except ValueError:
-                rec_dur = None
 
         # Create temporary directories once.
         annotation_dir = save_uploaded_files(annotation_files)
@@ -743,15 +744,16 @@ def build_evaluation_tab():
             if not selected_classes_list:
                 raise gr.Error(loc.localize("eval-tab-error-no-class-selected"))
 
-            if recording_duration_value.strip() == "":
-                rec_dur = None
-            else:
-                try:
-                    rec_dur = float(recording_duration_value)
-                except ValueError as e:
-                    raise gr.Error(
-                        loc.localize("eval-tab-error-no-valid-recording-duration")
-                    ) from e
+            try:
+                rec_dur = (
+                    float(recording_duration_value.strip())
+                    if recording_duration_value
+                    else None
+                )
+            except (ValueError, TypeError) as e:
+                raise gr.Error(
+                    loc.localize("eval-tab-error-no-valid-recording-duration")
+                ) from e
 
             if mapping_file_obj and hasattr(mapping_file_obj, "temp_files"):
                 mapping_path = list(mapping_file_obj.temp_files)[0]

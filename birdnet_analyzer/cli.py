@@ -323,11 +323,12 @@ def locale_args():
     """
     p = argparse.ArgumentParser(add_help=False)
 
+    locale_choices = get_args(get_args(MODEL_LANGUAGES)[0])
     p.add_argument(
         "-l",
         "--locale",
         default=cast("str", MODEL_LANGUAGE_EN_US),
-        choices=get_args(MODEL_LANGUAGES),
+        choices=locale_choices,
         help="Locale for translated species common names.",
     )
 
@@ -736,25 +737,19 @@ def species_parser():
     Creates an argument parser for retrieving a list of species for a given location using BirdNET.
     The parser includes the following arguments:
     - output: Path to the output file or folder. If a folder is provided, the file will be named 'species_list.txt'.
-    - --sortby: Optional argument to sort species by occurrence frequency ('freq') or alphabetically ('alpha'). Defaults to 'freq'.
+    - --locale: Locale for species names. Defaults to 'en_us'.
     Returns:
         argparse.ArgumentParser: Configured argument parser for species retrieval.
     """
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        parents=[species_list_args()],
+        parents=[species_list_args(), locale_args()],
     )
 
     parser.add_argument(
         "output",
         metavar="OUTPUT",
         help="Path to output file or folder. If this is a folder, file will be named 'species_list.txt'.",
-    )
-    parser.add_argument(
-        "--sortby",
-        default="freq",
-        choices=["freq", "alpha"],
-        help="Sort species by occurrence frequency or alphabetically. Values in ['freq', 'alpha'].",
     )
 
     return parser

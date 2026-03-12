@@ -30,8 +30,9 @@ def get_species_list(
     Returns:
         NDArray[np.str_]: Species list as numpy strings.
     """
-    species_list = model_utils.run_geomodel(
+    result = model_utils.run_geomodel(
         lat, lon, week, threshold=threshold, language=lang
     )
 
-    return species_list.species_list
+    return [str(species) for species, prob in result.to_structured_array()]
+

@@ -9,6 +9,8 @@ from birdnet.globals import (
     MODEL_LANGUAGES,
 )
 
+from birdnet_analyzer.config import AUTOTUNE_METRICS
+
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 ASCII_LOGO = r"""                        
                           .                                     
@@ -811,7 +813,7 @@ def train_parser():
         "--val_split",
         type=float,
         default=0.2,
-        help="Validation split ratio. Will be ignored if test_data is set.",
+        help="A small percentage of the training data that is not used for training, but for validation scores during training.",
     )
     parser.add_argument(
         "--learning_rate",
@@ -896,10 +898,22 @@ def train_parser():
         help="Number of training runs for hyperparameter tuning.",
     )
     parser.add_argument(
-        "--autotune_executions_per_trial",
+        "--autotune_n_splits",
         type=int,
         default=1,
-        help="The number of times a training run with a set of hyperparameters is repeated during hyperparameter tuning (this reduces the variance).",
+        help="Number of folds for cross-validation during hyperparameter tuning. If set to >1, the training data will be split into k folds and each training run will be executed k times with a different fold as validation data and the rest as training data. Keep in mind that this will significantly increase the runtime of the hyperparameter tuning process.",
+    )
+    parser.add_argument(
+        "--autotune_n_repeats",
+        type=int,
+        default=1,
+        help="Number of repetitions for each training run during hyperparameter tuning. If set to >1, each training run will be executed multiple times and the average validation score across all repetitions will be used as the score for the training run. This can help to get more robust estimates of the validation scores for each training run, but it will also increase the runtime of the hyperparameter tuning process.",
+    )
+    parser.add_argument(
+        "--autotune_metric",
+        default="val_AUPRC",
+        choices=get_args(AUTOTUNE_METRICS),
+        help="Metric to optimize during hyperparameter tuning. This can be any metric that is returned by the training process and is included in the training history object. Common choices are 'val_loss', 'val_AUPRC' or 'val_AUROC'.",
     )
 
     return parser

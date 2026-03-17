@@ -48,3 +48,104 @@ def test_train_cli(mock_train_model, setup_test_environment):
     call_kwargs = mock_train_model.call_args[1]
     assert call_kwargs["output"] == env["classifier_output"]
     assert mock_train_model.call_args[0][0] == env["input_dir"]
+
+
+def _make_dummy_history():
+    class DummyHistory:
+        history = {"val_AUPRC": [0.123]}
+
+    return DummyHistory()
+
+
+@patch("birdnet_analyzer.train.utils.model.save_raven_model")
+@patch("birdnet_analyzer.train.utils.model.save_linear_classifier")
+@patch("birdnet_analyzer.train.utils.model.build_linear_classifier")
+@patch("birdnet_analyzer.train.utils.model.train_linear_classifier")
+@patch("birdnet_analyzer.train.utils._load_training_data")
+@patch("birdnet_analyzer.train.utils.optuna", create=True)
+def test_autotune_uses_optuna(
+    mock_optuna,
+    mock_load,
+    mock_train,
+    mock_build,
+    mock_save_linear,
+    mock_save_raven,
+    setup_test_environment,
+):
+    # prepare stubbed data and model training
+    import numpy as np
+
+    mock_load.return_value = (
+        np.zeros((5, 10), dtype="float32"),
+        np.zeros((5, 3), dtype="float32"),
+        np.array([], dtype="float32"),  # no test samples to avoid evaluation step
+        np.array([], dtype="float32"),
+        ["a", "b", "c"],
+        False,
+        False,
+    )
+    # use a mutable sequence so classifier.pop() used during save does not blow up
+    mock_build.return_value = []
+    # training returns (classifier, history); classifier must support pop()
+    # give a classifier with at least one element so pop() succeeds
+    mock_train.return_value = ([1], _make_dummy_history())
+
+    # create fake study object which records calls
+    import sys
+
+    # make sure the `import optuna` in train_model doesn't raise ImportError
+    sys.modules.setdefault("optuna", mock_optuna)
+
+    dummy_study = type("S", (), {"enqueue_trial": lambda self, params: None})()
+    calls = {}
+
+    def fake_optimize(obj, n_trials):
+        calls["optimized"] = n_trials
+
+        # simulate a single trial evaluation (trial.number=0)
+        class DummyTrial:
+            def __init__(self):
+                self.number = 0
+
+            def suggest_categorical(self, name, choices):
+                return choices[0]
+
+        obj(DummyTrial())
+        dummy_study.best_params = {
+            "hidden_units": 0,
+            "dropout": 0.0,
+            "batch_size": 8,
+            "learning_rate": 0.0001,
+            "upsampling_ratio": 0.0,
+            "mixup": False,
+            "label_smoothing": False,
+            "focal_loss": False,
+        }
+
+    dummy_study.optimize = fake_optimize
+    mock_optuna.create_study.return_value = dummy_study
+
+    from birdnet_analyzer.train.utils import train_model
+
+    env = setup_test_environment
+    # ensure output directory exists so sample_counts can be written
+    os.makedirs(env["classifier_output"], exist_ok=True)
+
+    # call with autotune enabled
+    try:
+        train_model(
+            env["input_dir"],
+            output=env["classifier_output"],
+            autotune=True,
+            autotune_trials=3,
+        )
+    except Exception as e:  # pragma: no cover - we want failure message
+        pytest.fail(f"train_model raised during autotune: {e!r}")
+
+    mock_optuna.create_study.assert_called_once_with(
+        direction="maximize", study_name="birdnet_analyzer"
+    )
+    assert calls.get("optimized") == 3
+    # build_linear_classifier should be called at least once (during tuning)
+    assert mock_build.called
+    assert mock_train.called

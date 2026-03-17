@@ -41,20 +41,25 @@ class WrappedSavedModel(keras.layers.Layer):
 
 
 def get_empty_class_exception():
-    import keras_tuner.errors
+    """Return a reusable exception class for signaling empty classes.
 
+    The previous implementation subclassed
+    :class:`keras_tuner.errors.FatalError` simply because the tuner was
+    responsible for raising the error. After switching to ``optuna`` we no
+    longer have a dependency on ``keras_tuner``; a plain :class:`Exception` is
+    sufficient.
+    """
     global EMPTY_CLASS_EXCEPTION_REF  # noqa: PLW0603
 
     if EMPTY_CLASS_EXCEPTION_REF:
         return EMPTY_CLASS_EXCEPTION_REF
 
-    class EmptyClassException(keras_tuner.errors.FatalError):
-        """
-        Exception raised when a class is found to be empty.
+    class EmptyClassException(Exception):
+        """Error raised when a label channel contains no samples.
 
         Attributes:
             index (int): The index of the empty class.
-            message (str): The error message indicating which class is empty.
+            message (str): Human readable error message.
         """
 
         def __init__(self, *args, index=None):
@@ -467,18 +472,18 @@ def build_linear_classifier(num_labels, input_size, hidden_units=0, dropout=0.0)
 
 def train_linear_classifier(
     classifier: keras.Model,
-    x_train,
-    y_train,
-    x_test,
-    y_test,
-    epochs,
-    batch_size,
-    learning_rate,
-    val_split,
-    upsampling_ratio,
-    upsampling_mode,
-    train_with_mixup,
-    train_with_label_smoothing,
+    x_train: np.ndarray,
+    y_train: np.ndarray,
+    x_val: np.ndarray,
+    y_val: np.ndarray,
+    epochs: int,
+    batch_size: int,
+    learning_rate: float,
+    val_split: float,
+    upsampling_ratio: float,
+    upsampling_mode: str,
+    train_with_mixup: bool,
+    train_with_label_smoothing: bool,
     train_with_focal_loss=False,
     focal_loss_gamma=2.0,
     focal_loss_alpha=0.25,
@@ -543,13 +548,15 @@ def train_linear_classifier(
             x_train, y_train, x_val, y_val = random_multilabel_split(
                 x_train, y_train, rng, val_split
             )
-    else:
-        x_val = x_test
-        y_val = y_test
 
     if upsampling_ratio > 0:
         x_train, y_train = upsampling(
-            x_train, y_train, rng, upsampling_ratio, upsampling_mode
+            x_train,
+            y_train,
+            rng,
+            is_binary_classification,
+            upsampling_ratio,
+            upsampling_mode,
         )
 
     if train_with_mixup and not is_binary_classification:

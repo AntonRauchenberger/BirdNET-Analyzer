@@ -43,7 +43,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-train = ["keras-tuner"]
+train = ["optuna"]
 server = ["bottle", "requests"]
 gui = [
     "birdnet-analyzer[train,embeddings]",

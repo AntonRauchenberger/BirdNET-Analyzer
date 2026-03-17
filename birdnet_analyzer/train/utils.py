@@ -12,9 +12,14 @@ from typing import TYPE_CHECKING
 import numpy as np
 import tqdm
 from birdnet import load
+from sklearn.model_selection import RepeatedStratifiedKFold
 
 from birdnet_analyzer import audio, model, model_utils, utils
-from birdnet_analyzer.config import ALLOWED_FILETYPES, NON_EVENT_CLASSES
+from birdnet_analyzer.config import (
+    ALLOWED_FILETYPES,
+    AUTOTUNE_METRICS,
+    NON_EVENT_CLASSES,
+)
 from birdnet_analyzer.model_utils import GLOBAL_PREFETCH_RATIO
 
 if TYPE_CHECKING:
@@ -114,6 +119,7 @@ def _load_audio_file(
 
     # turns out that batch size 1 is the fastest, probably because of having to resize
     # the model input when the number of samples in a batch changes
+    # TODO: Still faster?
     batch_size = 1
 
     for i in range(0, len(sig_splits), batch_size):
@@ -173,14 +179,7 @@ def _load_training_data(
     """
 
     if audio_input.endswith(".npz"):
-        if os.path.isfile(audio_input):
-            x_train, y_train, x_test, y_test, labels, is_binary, is_multi_label = (
-                _load_from_cache(audio_input)
-            )
-
-            return x_train, y_train, x_test, y_test, labels, is_binary, is_multi_label
-
-        raise FileNotFoundError(f"Cache file not found: {audio_input}")
+        return _load_from_cache(audio_input)
 
     train_folders = list(utils.list_subdirectories(audio_input))
     labels: list[str] = []
@@ -274,6 +273,7 @@ def _load_training_data(
                 )
 
                 num_files_processed = 0
+
                 with tqdm.tqdm(
                     total=len(files), desc=f" - loading '{folder}'", unit="f"
                 ) as progress_bar:
@@ -367,11 +367,12 @@ def train_model(
     audio_speed: float = 1.0,
     autotune: bool = False,
     autotune_trials: int = 50,
-    autotune_executions_per_trial: int = 1,
+    autotune_n_splits: int = 5,
+    autotune_n_repeats: int = 1,
+    autotune_metric: AUTOTUNE_METRICS = "val_AUPRC",
     on_epoch_end=None,
     on_trial_result=None,
     on_data_load_end=None,
-    autotune_directory="autotune",
 ):
     """Trains a custom classifier.
 
@@ -414,184 +415,164 @@ def train_model(
         import gc
 
         import keras
-        import keras_tuner
+        import optuna
 
         if on_trial_result:
             on_trial_result(0)
 
-        class BirdNetTuner(keras_tuner.BayesianOptimization):
-            def __init__(
-                self,
-                x_train,
-                y_train,
-                x_test,
-                y_test,
-                max_trials,
-                executions_per_trial,
-                on_trial_result,
-            ):
-                super().__init__(
-                    max_trials=max_trials,
-                    executions_per_trial=executions_per_trial,
-                    overwrite=True,
-                    directory=autotune_directory,
-                    project_name="birdnet_analyzer",
+        study = optuna.create_study(
+            direction=optuna.study.StudyDirection.MAXIMIZE,
+            study_name="birdnet_analyzer",
+        )
+
+        def objective(trial: optuna.trial.Trial):
+            histories: list[float] = []
+            h_units = trial.suggest_categorical(
+                "hidden_units", [0, 128, 256, 512, 1024, 2048]
+            )
+            dr = trial.suggest_categorical("dropout", [0.0, 0.25, 0.33, 0.5, 0.75, 0.9])
+            upsampling_choices = ["repeat", "mean", "linear"]
+
+            if is_multi_label:
+                upsampling_choices = ["repeat"]
+
+            # Create stratified k-fold splits for cross-validation
+            # For multi-label, create a pseudo-label based on number of active labels
+            # TODO: Is this the best way to do stratification for multi-label data?
+            if is_multi_label:
+                stratify_labels = np.sum(y_train > 0, axis=1)
+            else:
+                stratify_labels = np.argmax(y_train, axis=1)
+
+            if autotune_n_splits == 1:
+                # Simple single validation split (no k-fold)
+                n_samples = len(x_train)
+                split_point = int(n_samples * (1 - val_split))
+                indices = np.arange(n_samples)
+                np.random.RandomState(42).shuffle(indices)
+
+                splits = (
+                    (indices[:split_point], indices[split_point:])
+                    for _ in range(autotune_n_repeats)
                 )
-                self.x_train = x_train
-                self.y_train = y_train
-                self.x_test = x_test
-                self.y_test = y_test
-                self.on_trial_result = on_trial_result
+            else:
+                # Repeated stratified k-fold cross-validation
+                skf = RepeatedStratifiedKFold(
+                    n_splits=autotune_n_splits,
+                    n_repeats=autotune_n_repeats,
+                    random_state=42,
+                )
+                splits = skf.split(x_train, stratify_labels)
 
-            def run_trial(self, trial: keras_tuner.engine.trial.Trial, *args, **kwargs):
-                histories = []
-                hp: keras_tuner.HyperParameters = trial.hyperparameters
-                trial_number = len(self.oracle.trials)
+            for train_idx, val_idx in splits:
+                bs = trial.suggest_categorical("batch_size", [8, 16, 32, 64, 128])
 
-                for _ in range(int(self.executions_per_trial)):
-                    classifier = model.build_linear_classifier(
-                        self.y_train.shape[1],
-                        self.x_train.shape[1],
-                        hidden_units=hp.Choice(
-                            "hidden_units",
-                            [0, 128, 256, 512, 1024, 2048],
-                            default=hidden_units,
-                        ),  # type: ignore
-                        dropout=hp.Choice(
-                            "dropout",
-                            [0.0, 0.25, 0.33, 0.5, 0.75, 0.9],
-                            default=dropout,
-                        ),  # type: ignore
+                if bs == 8:
+                    lr = trial.suggest_categorical(
+                        "learning_rate", [0.0005, 0.0002, 0.0001]
                     )
-                    # Only allow repeat upsampling in multi-label setting
-                    # SMOTE is too slow
-                    upsampling_choices = ["repeat", "mean", "linear"]
-
-                    if is_multi_label:
-                        upsampling_choices = ["repeat"]
-
-                    tuner_batch_size = hp.Choice(
-                        "batch_size", [8, 16, 32, 64, 128], default=batch_size
+                elif bs == 16:
+                    lr = trial.suggest_categorical(
+                        "learning_rate", [0.005, 0.002, 0.001, 0.0005, 0.0002]
                     )
+                elif bs == 32:
+                    lr = trial.suggest_categorical(
+                        "learning_rate", [0.01, 0.005, 0.001, 0.0005, 0.0001]
+                    )
+                elif bs == 64:
+                    lr = trial.suggest_categorical(
+                        "learning_rate", [0.01, 0.005, 0.002, 0.001]
+                    )
+                else:
+                    lr = trial.suggest_categorical("learning_rate", [0.1, 0.01, 0.005])
 
-                    if tuner_batch_size == 8:
-                        learning_rate = hp.Choice(
-                            "learning_rate_8",
-                            [0.0005, 0.0002, 0.0001],
-                            default=0.0001,
-                            parent_name="batch_size",
-                            parent_values=[8],
-                        )
-                    elif tuner_batch_size == 16:
-                        learning_rate = hp.Choice(
-                            "learning_rate_16",
-                            [0.005, 0.002, 0.001, 0.0005, 0.0002],
-                            default=0.0005,
-                            parent_name="batch_size",
-                            parent_values=[16],
-                        )
-                    elif tuner_batch_size == 32:
-                        learning_rate = hp.Choice(
-                            "learning_rate_32",
-                            [0.01, 0.005, 0.001, 0.0005, 0.0001],
-                            default=0.0001,
-                            parent_name="batch_size",
-                            parent_values=[32],
-                        )
-                    elif tuner_batch_size == 64:
-                        learning_rate = hp.Choice(
-                            "learning_rate_64",
-                            [0.01, 0.005, 0.002, 0.001],
-                            default=0.001,
-                            parent_name="batch_size",
-                            parent_values=[64],
-                        )
-                    elif tuner_batch_size == 128:
-                        learning_rate = hp.Choice(
-                            "learning_rate_128",
-                            [0.1, 0.01, 0.005],
-                            default=0.005,
-                            parent_name="batch_size",
-                            parent_values=[128],
-                        )
+                up_ratio = trial.suggest_categorical(
+                    "upsampling_ratio", [0.0, 0.25, 0.33, 0.5, 0.75, 1.0]
+                )
 
-                    classifier, history = model.train_linear_classifier(
-                        classifier,
-                        self.x_train,
-                        self.y_train,
-                        self.x_test,
-                        self.y_test,
-                        epochs=epochs,
-                        batch_size=tuner_batch_size,
-                        learning_rate=learning_rate,
-                        val_split=0.0 if len(self.x_test) > 0 else val_split,
-                        upsampling_ratio=hp.Choice(
-                            "upsampling_ratio",
-                            [0.0, 0.25, 0.33, 0.5, 0.75, 1.0],
-                            default=upsampling_ratio,
-                        ),
-                        upsampling_mode=hp.Choice(
-                            "upsampling_mode",
-                            upsampling_choices,
-                            default=upsampling_mode,
-                            parent_name="upsampling_ratio",
-                            parent_values=[0.25, 0.33, 0.5, 0.75, 1.0],
-                        ),
-                        train_with_mixup=hp.Boolean("mixup", default=mixup),
-                        train_with_label_smoothing=hp.Boolean(
-                            "label_smoothing", default=label_smoothing
-                        ),
-                        train_with_focal_loss=hp.Boolean(
-                            "focal_loss", default=use_focal_loss
-                        ),  # type: ignore
-                        focal_loss_gamma=hp.Choice(
-                            "focal_loss_gamma",
-                            [0.5, 1.0, 2.0, 3.0, 4.0],
-                            default=focal_loss_gamma,
-                            parent_name="focal_loss",
-                            parent_values=[True],
-                        ),  # type: ignore
-                        focal_loss_alpha=hp.Choice(
-                            "focal_loss_alpha",
-                            [0.1, 0.25, 0.5, 0.75, 0.9],
-                            default=focal_loss_alpha,
-                            parent_name="focal_loss",
-                            parent_values=[True],
-                        ),  # type: ignore
-                        is_binary_classification=is_binary,
-                        is_multi_label=is_multi_label,
+                if up_ratio > 0:
+                    up_mode = trial.suggest_categorical(
+                        "upsampling_mode", upsampling_choices
+                    )
+                else:
+                    up_mode = upsampling_mode
+
+                mix = trial.suggest_categorical("mixup", [True, False])
+                ls = trial.suggest_categorical("label_smoothing", [True, False])
+                focal = trial.suggest_categorical("focal_loss", [True, False])
+                fg = focal_loss_gamma
+                fa = focal_loss_alpha
+
+                if focal:
+                    fg = trial.suggest_categorical(
+                        "focal_loss_gamma", [0.5, 1.0, 2.0, 3.0, 4.0]
+                    )
+                    fa = trial.suggest_categorical(
+                        "focal_loss_alpha", [0.1, 0.25, 0.5, 0.75, 0.9]
                     )
 
-                    # Get the best validation AUPRC instead of loss
-                    best_val_auprc = history.history["val_AUPRC"][
-                        np.argmax(history.history["val_AUPRC"])
-                    ]
-                    histories.append(best_val_auprc)
+                classifier = model.build_linear_classifier(
+                    y_train.shape[1],
+                    x_train.shape[1],
+                    h_units,
+                    dr,
+                )
+                classifier, history = model.train_linear_classifier(
+                    classifier,
+                    x_train[train_idx],
+                    y_train[train_idx],
+                    x_train[val_idx],
+                    y_train[val_idx],
+                    epochs=epochs,
+                    batch_size=bs,
+                    learning_rate=lr,
+                    val_split=0.0,
+                    upsampling_ratio=up_ratio,
+                    upsampling_mode=up_mode,
+                    train_with_mixup=mix,
+                    train_with_label_smoothing=ls,
+                    train_with_focal_loss=focal,
+                    focal_loss_gamma=fg,
+                    focal_loss_alpha=fa,
+                    is_binary_classification=is_binary,
+                    is_multi_label=is_multi_label,
+                )
+
+                best_score = history.history[autotune_metric][
+                    np.argmax(history.history[autotune_metric])
+                ]
+                histories.append(best_score)
 
                 keras.backend.clear_session()
                 del classifier
                 del history
                 gc.collect()
 
-                if self.on_trial_result:
-                    self.on_trial_result(trial_number)
+            if callable(on_trial_result):
+                on_trial_result(trial.number + 1)
 
-                # Return the negative AUPRC for minimization
-                # (keras-tuner minimizes by default)
-                return [-h for h in histories]
+            return float(np.mean(histories))
 
-        tuner = BirdNetTuner(
-            x_train=x_train,
-            y_train=y_train,
-            x_test=x_test,
-            y_test=y_test,
-            max_trials=autotune_trials,
-            executions_per_trial=autotune_executions_per_trial,
-            on_trial_result=on_trial_result,
+        # enqueue the defaults as first trial so that the passed default
+        # hyperparameters are evaluated even if tuning is skipped
+        study.enqueue_trial(
+            {
+                "hidden_units": hidden_units,
+                "dropout": dropout,
+                "batch_size": batch_size,
+                "learning_rate": learning_rate,
+                "upsampling_ratio": upsampling_ratio,
+                "upsampling_mode": upsampling_mode,
+                "mixup": mixup,
+                "label_smoothing": label_smoothing,
+                "focal_loss": use_focal_loss,
+                "focal_loss_gamma": focal_loss_gamma,
+                "focal_loss_alpha": focal_loss_alpha,
+            }
         )
 
         try:
-            tuner.search()
+            study.optimize(objective, n_trials=autotune_trials)
         except model.get_empty_class_exception() as e:
             e.message = (
                 f"Class with label {labels[e.index]} is empty. "  # type: ignore
@@ -600,16 +581,16 @@ def train_model(
             e.args = (e.message,)
             raise e
 
-        best_params = tuner.get_best_hyperparameters()[0]
+        best_params = study.best_params
         hidden_units = best_params["hidden_units"]
         dropout = best_params["dropout"]
         batch_size = best_params["batch_size"]
-        learning_rate = best_params[f"learning_rate_{batch_size}"]
-
-        if best_params["upsampling_ratio"] > 0:
-            upsampling_mode = best_params["upsampling_mode"]
+        learning_rate = best_params.get("learning_rate", learning_rate)
 
         upsampling_ratio = best_params["upsampling_ratio"]
+        if upsampling_ratio > 0:
+            upsampling_mode = best_params["upsampling_mode"]
+
         mixup = best_params["mixup"]
         label_smoothing = best_params["label_smoothing"]
         use_focal_loss = best_params["focal_loss"]

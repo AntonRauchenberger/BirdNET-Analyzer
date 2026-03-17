@@ -35,3 +35,4 @@ UPSAMPLING_MODES = Literal["repeat", "mean", "smote"]
 TRAINED_MODEL_OUTPUT_FORMATS = Literal["tflite", "raven", "both"]
 TRAINED_MODEL_SAVE_MODES = Literal["replace", "append"]
 ERROR_LOG_FILE: str = os.path.join(SCRIPT_DIR, "error_log.txt")
+AUTOTUNE_METRICS = Literal["val_loss", "val_AUPRC", "val_AUROC"]

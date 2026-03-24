@@ -567,7 +567,6 @@ def train_linear_classifier(
 
     patience = min(10, max(5, int(epochs / 10)))
     min_delta = 0.001
-
     callbacks = [
         keras.callbacks.EarlyStopping(
             monitor="val_loss",
@@ -579,7 +578,6 @@ def train_linear_classifier(
         ),
         FunctionCallback(on_epoch_end=on_epoch_end),
     ]
-
     warmup_epochs = min(5, int(epochs * 0.1))
 
     def lr_schedule(epoch, lr):

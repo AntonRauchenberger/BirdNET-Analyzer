@@ -23,6 +23,8 @@ from birdnet_analyzer.config import (
 from birdnet_analyzer.model_utils import GLOBAL_PREFETCH_RATIO
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from birdnet_analyzer.config import (
         SAMPLE_CROP_MODES,
         TRAINED_MODEL_OUTPUT_FORMATS,
@@ -367,7 +369,7 @@ def train_model(
     audio_speed: float = 1.0,
     autotune: bool = False,
     autotune_trials: int = 50,
-    autotune_n_splits: int = 5,
+    autotune_n_splits: int = 1,
     autotune_n_repeats: int = 1,
     autotune_metric: AUTOTUNE_METRICS = "val_AUPRC",
     on_epoch_end=None,
@@ -386,30 +388,36 @@ def train_model(
         A keras `History` object, whose `history` property contains all the metrics.
     """
 
-    x_train, y_train, x_test, y_test, labels, is_binary, is_multi_label = (
-        _load_training_data(
-            audio_input,
-            test_data=test_data,
-            upsampling_ratio=upsampling_ratio,
-            upsampling_mode=upsampling_mode,
-            fmin=fmin,
-            fmax=fmax,
-            audio_speed=audio_speed,
-            crop_mode=crop_mode,
-            overlap=overlap,
-            min_len=1.0,
-            threads=threads,
-            save_cache_to=save_cache_to,
-            progress_callback=on_data_load_end,
-        )
+    (
+        x_train_full,
+        y_train_full,
+        x_val_full,
+        y_val_full,
+        labels,
+        is_binary,
+        is_multi_label,
+    ) = _load_training_data(
+        audio_input,
+        test_data=test_data,
+        upsampling_ratio=upsampling_ratio,
+        upsampling_mode=upsampling_mode,
+        fmin=fmin,
+        fmax=fmax,
+        audio_speed=audio_speed,
+        crop_mode=crop_mode,
+        overlap=overlap,
+        min_len=1.0,
+        threads=threads,
+        save_cache_to=save_cache_to,
+        progress_callback=on_data_load_end,
     )
     print(
-        f"...Done. Loaded {x_train.shape[0]} training samples "
-        + f"and {y_train.shape[1]} labels.",
+        f"...Done. Loaded {x_train_full.shape[0]} training samples "
+        + f"and {y_train_full.shape[1]} labels.",
         flush=True,
     )
-    if len(x_test) > 0:
-        print(f"...Loaded {x_test.shape[0]} test samples.", flush=True)
+    if len(x_val_full) > 0:
+        print(f"...Loaded {x_val_full.shape[0]} test samples.", flush=True)
 
     if autotune:
         import gc
@@ -440,32 +448,75 @@ def train_model(
             # For multi-label, create a pseudo-label based on number of active labels
             # TODO: Is this the best way to do stratification for multi-label data?
             if is_multi_label:
-                stratify_labels = np.sum(y_train > 0, axis=1)
+                stratify_labels = np.sum(y_train_full > 0, axis=1)
             else:
-                stratify_labels = np.argmax(y_train, axis=1)
+                stratify_labels = np.argmax(y_train_full, axis=1)
 
-            if autotune_n_splits == 1:
-                # Simple single validation split (no k-fold)
-                n_samples = len(x_train)
-                split_point = int(n_samples * (1 - val_split))
-                indices = np.arange(n_samples)
-                np.random.RandomState(42).shuffle(indices)
+            def generate_splits(
+                x_train: np.ndarray,
+                y_train: np.ndarray,
+                x_test: np.ndarray,
+                y_test: np.ndarray,
+                val_split: float,
+                autotune_n_splits: int,
+                autotune_n_repeats: int,
+            ) -> Generator[
+                tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, float], None, None
+            ]:
+                if x_test:
+                    # If test data is available, use a single split with the test data
+                    splits = [
+                        (
+                            np.arange(len(x_train)),
+                            np.arange(len(x_test)),
+                        )
+                    ]
+                    for train_idx, val_idx in splits:
+                        yield (
+                            x_train[train_idx],
+                            y_train[train_idx],
+                            x_test[val_idx],
+                            y_test[val_idx],
+                            0.0,
+                        )
+                elif autotune_n_splits == 1:
+                    splits = [(np.arange(len(x_train)),)]
+                    for train_idx in splits:
+                        yield (
+                            x_train[train_idx],
+                            y_train[train_idx],
+                            [],
+                            [],
+                            val_split,
+                        )
+                else:
+                    # Repeated stratified k-fold cross-validation
+                    skf = RepeatedStratifiedKFold(
+                        n_splits=autotune_n_splits,
+                        n_repeats=autotune_n_repeats,
+                        random_state=42,  # TODO: use same state
+                    )
 
-                splits = (
-                    (indices[:split_point], indices[split_point:])
-                    for _ in range(autotune_n_repeats)
-                )
-            else:
-                # Repeated stratified k-fold cross-validation
-                skf = RepeatedStratifiedKFold(
-                    n_splits=autotune_n_splits,
-                    n_repeats=autotune_n_repeats,
-                    random_state=42,
-                )
-                splits = skf.split(x_train, stratify_labels)
+                    for train_idx, val_idx in skf.split(x_train, stratify_labels):
+                        yield (
+                            x_train[train_idx],
+                            y_train[train_idx],
+                            x_train[val_idx],
+                            y_train[val_idx],
+                            0.0,
+                        )
 
-            for train_idx, val_idx in splits:
+            for x_train, y_train, x_val, y_val, val_percentage in generate_splits(
+                x_train_full,
+                y_train_full,
+                x_val_full,
+                y_val_full,
+                val_split,
+                autotune_n_splits,
+                autotune_n_repeats,
+            ):
                 bs = trial.suggest_categorical("batch_size", [8, 16, 32, 64, 128])
+                # trial.suggest_loguniform
 
                 if bs == 8:
                     lr = trial.suggest_categorical(
@@ -519,14 +570,14 @@ def train_model(
                 )
                 classifier, history = model.train_linear_classifier(
                     classifier,
-                    x_train[train_idx],
-                    y_train[train_idx],
-                    x_train[val_idx],
-                    y_train[val_idx],
+                    x_train,
+                    y_train,
+                    x_val,
+                    y_val,
                     epochs=epochs,
                     batch_size=bs,
                     learning_rate=lr,
-                    val_split=0.0,
+                    val_split=val_percentage,
                     upsampling_ratio=up_ratio,
                     upsampling_mode=up_mode,
                     train_with_mixup=mix,
@@ -537,12 +588,11 @@ def train_model(
                     is_binary_classification=is_binary,
                     is_multi_label=is_multi_label,
                 )
-
                 best_score = history.history[autotune_metric][
                     np.argmax(history.history[autotune_metric])
                 ]
-                histories.append(best_score)
 
+                histories.append(best_score)
                 keras.backend.clear_session()
                 del classifier
                 del history
@@ -600,20 +650,20 @@ def train_model(
             focal_loss_gamma = best_params["focal_loss_gamma"]
 
     classifier = model.build_linear_classifier(
-        y_train.shape[1], x_train.shape[1], hidden_units, dropout
+        y_train_full.shape[1], x_train_full.shape[1], hidden_units, dropout
     )
 
     try:
         classifier, history = model.train_linear_classifier(
             classifier,
-            x_train,
-            y_train,
-            x_test,
-            y_test,
+            x_train_full,
+            y_train_full,
+            x_val_full,
+            y_val_full,
             epochs=epochs,
             batch_size=batch_size,
             learning_rate=learning_rate,
-            val_split=val_split if len(x_test) == 0 else 0.0,
+            val_split=val_split if len(x_val_full) == 0 else 0.0,
             upsampling_ratio=upsampling_ratio,
             upsampling_mode=upsampling_mode,
             train_with_mixup=mixup,
@@ -695,13 +745,13 @@ def train_model(
     except Exception as e:
         raise Exception("Error saving model") from e
 
-    save_sample_counts(labels, y_train, output)
+    save_sample_counts(labels, y_train_full, output)
 
     # Evaluate model on test data if available
     metrics = None
 
-    if len(x_test) > 0:
-        metrics = evaluate_model(classifier, x_test, y_test, labels)
+    if len(x_val_full) > 0:
+        metrics = evaluate_model(classifier, x_val_full, y_val_full, labels)
 
         if metrics:
             import csv

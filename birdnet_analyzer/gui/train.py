@@ -8,7 +8,6 @@ import gradio as gr
 import birdnet_analyzer.gui.localization as loc
 import birdnet_analyzer.gui.utils as gu
 from birdnet_analyzer import utils
-from birdnet_analyzer.gui.settings import APPDIR
 
 _GRID_MAX_HEIGHT = 240
 
@@ -54,7 +53,8 @@ def start_training(
     cache_file_name,
     autotune,
     autotune_trials,
-    autotune_executions_per_trials,
+    autotune_folds,
+    autotune_repeats,
     epochs,
     batch_size,
     learning_rate,
@@ -88,7 +88,8 @@ def start_training(
         cache_file_name: Name of the cache file.
         autotune: Whether to use hyperparameter autotuning.
         autotune_trials: Number of trials for autotuning.
-        autotune_executions_per_trials: Number of executions per autotuning trial.
+        autotune_folds: Number of folds for autotuning.
+        autotune_repeats: Number of repeats for each autotuning trial.
         epochs: Number of training epochs.
         batch_size: Batch size for training.
         learning_rate: Learning rate for the optimizer.
@@ -215,9 +216,9 @@ def start_training(
             if audio_speed < 0
             else max(1.0, float(audio_speed)),
             autotune=autotune,
-            autotune_trials=autotune_trials,
-            autotune_executions_per_trial=int(autotune_executions_per_trials),
-            autotune_directory=APPDIR if utils.FROZEN else "autotune",
+            autotune_trials=int(autotune_trials),
+            autotune_n_splits=int(autotune_folds),
+            autotune_n_repeats=int(autotune_repeats),
         )
     except Exception as e:
         if e.args and len(e.args) > 1:
@@ -510,11 +511,17 @@ def build_train_tab():
                 info=loc.localize("training-tab-autotune-trials-number-info"),
                 minimum=1,
             )
-            autotune_executions_per_trials = gr.Number(
+            autotune_folds = gr.Number(
+                5,
+                minimum=1,
+                label=loc.localize("training-tab-autotune-folds-number-label"),
+                info=loc.localize("training-tab-autotune-folds-number-info"),
+            )
+            autotune_repeats = gr.Number(
                 1,
                 minimum=1,
-                label=loc.localize("training-tab-autotune-executions-number-label"),
-                info=loc.localize("training-tab-autotune-executions-number-info"),
+                label=loc.localize("training-tab-autotune-repeats-number-label"),
+                info=loc.localize("training-tab-autotune-repeats-number-info"),
             )
 
         with gr.Column() as custom_params:
@@ -746,7 +753,8 @@ def build_train_tab():
                 cache_file_name,
                 autotune_cb,
                 autotune_trials,
-                autotune_executions_per_trials,
+                autotune_folds,
+                autotune_repeats,
                 epoch_number,
                 batch_size_number,
                 learning_rate_number,

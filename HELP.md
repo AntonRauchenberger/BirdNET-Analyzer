@@ -1,0 +1,2 @@
+- Starten der python Umgebung: `source birdnet-env/bin/activate`
+- Starten der Analyse: `python -m birdnet_analyzer.analyze audio/tests/amsel.wav`

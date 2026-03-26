@@ -152,6 +152,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+birdnet-env/
 
 # Spyder project settings
 .spyderproject
@@ -181,3 +182,6 @@ BirdNET_analysis_params.csv
 
 # Build files
 entitlements.plist
+
+# Help and testing files
+audio/tests/**

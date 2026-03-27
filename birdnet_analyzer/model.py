@@ -1135,7 +1135,9 @@ def predict(sample):
     if cfg.USE_PERCH:
         return predict_with_perch(sample)
 
+    cfg.METRICS_SERVICE.start_timer("model_load")
     load_model()
+    cfg.METRICS_SERVICE.stop_timer("model_load")
 
     if PBMODEL is None:
         # Reshape input tensor

@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 import time
 import datetime
+import threading
 import birdnet_analyzer.config as cfg
 from dataclasses import dataclass, field
 from typing import Any, Iterable
@@ -25,14 +26,35 @@ def _bytes_to_mb(num_bytes: float) -> float:
     return num_bytes / (1024 * 1024)
 
 
+class MemorySampler(threading.Thread):
+    def __init__(self, service_ref, interval=0.01): # 10 ms so ram use measurements are not disturbed
+        super().__init__()
+        self.service = service_ref
+        self.interval = interval
+        self.peak_ram = 0.0
+        self._stop_event = threading.Event()
+
+    def run(self):
+        while not self._stop_event.is_set():
+            # Aktuellen RAM abfragen
+            current_ram = self.service.get_ram_usage_mb()
+            if current_ram > self.peak_ram:
+                self.peak_ram = current_ram
+            time.sleep(self.interval)
+
+    def stop(self):
+        self._stop_event.set()
+        return self.peak_ram
+
 @dataclass
 class _TimerRun:
     """Stores raw data for one timer run (start -> stop)."""
 
     wall_seconds: float
     cpu_seconds: float
-    rss_start_bytes: int
+    rss_start_bytes: int # Needed RAM storage at the start
     rss_end_bytes: int
+    peak_interval_mb: float = 0.0 # peak ram usage during measurement
 
     @property
     def rss_delta_bytes(self) -> int:
@@ -41,7 +63,7 @@ class _TimerRun:
 
 @dataclass
 class _TimerStats:
-    """Aggregates multiple runs for a single named timer."""
+    """Aggregates multiple runs for a single named timer, calculates average values."""
 
     runs: list[_TimerRun] = field(default_factory=list)
 
@@ -133,6 +155,9 @@ class MetricsService:
             self._model_size_mb = None
 
     def _get_ram_usage_edge(self) -> float:
+        """
+        Uses unix system files
+        """
         try:
             with open("/proc/self/status") as f:
                 for line in f:
@@ -145,10 +170,7 @@ class MetricsService:
 
     def get_ram_usage_mb(self) -> float:
         """
-        Current RAM usage (RSS) of the current Python process in MB.
-
-        Why it's important:
-        - RAM is often the strictest limit on small devices.
+        Current RAM usage (RSS: Resident Set Size) of the current Python process in MB.
         """
         if not self._light_mode:
             return _bytes_to_mb(self._proc.memory_info().rss)
@@ -173,6 +195,16 @@ class MetricsService:
         cores = psutil.cpu_count(logical=True) or 1
         return raw / cores
 
+    def get_peak_ram_usage_mb(self) -> float:
+        """
+        Gets the maximum memory usage
+        """
+        if os.name == 'posix':  # Linux/Mac
+            import resource
+            # ru_maxrss in KB
+            return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+        return 0.0
+
     def start_timer(self, name: str) -> None:
         """
         Start a named timer.
@@ -184,7 +216,7 @@ class MetricsService:
         if name in self._active_starts:
             raise ValueError(f"Timer '{name}' is already running. Stop it before starting again.")
 
-        t0 = time.perf_counter()
+        t0 = time.perf_counter() # wall time: real world time
 
         if self._light_mode:
             # Lightweight CPU measurement (works on Raspberry Pi)
@@ -192,14 +224,21 @@ class MetricsService:
             cpu0 = float(cpu_times.user + cpu_times.system)
             rss0 = self._get_ram_usage_edge() * 1024 * 1024
         else:
-            cpu_times = self._proc.cpu_times()
+            cpu_times = self._proc.cpu_times() # cpu time: real time value, the process was acitve 
             cpu0 = float(cpu_times.user + cpu_times.system)
             rss0 = int(self._proc.memory_info().rss)
+
+        # Start runner to measure ram peaks during inference
+        sampler = None
+        if name == "inference":
+            sampler = MemorySampler(self)
+            sampler.start()
 
         self._active_starts[name] = {
             "t0": t0,
             "cpu0": cpu0,
             "rss0": rss0,
+            "sampler": sampler
         }
 
     def stop_timer(self, name: str) -> float:
@@ -226,11 +265,18 @@ class MetricsService:
         wall = max(0.0, t1 - float(snap["t0"]))
         cpu = max(0.0, cpu1 - float(snap["cpu0"]))
 
+        # stop inference ram measure runner
+        interval_peak_mb = 0.0
+        if "sampler" in snap and snap["sampler"] is not None:
+            interval_peak_mb = snap["sampler"].stop()
+            snap["sampler"].join()
+
         run = _TimerRun(
             wall_seconds=wall,
             cpu_seconds=cpu,
             rss_start_bytes=int(snap["rss0"]),
             rss_end_bytes=rss1,
+            peak_interval_mb=interval_peak_mb
         )
 
         stats = self._timers.setdefault(name, _TimerStats())
@@ -277,7 +323,7 @@ class MetricsService:
 
         IMPORTANT:
         - This is NOT a real power measurement.
-        - We approximate energy from CPU-time using:
+        - Approximate energy from CPU-time using:
               Energy (J) = CPU_time_seconds * assumed_cpu_power_watts
         - Real energy depends on CPU frequency, voltage, load, peripherals, and more.
 
@@ -314,6 +360,7 @@ class MetricsService:
 
         confidence = f"{self._confidence * 100:.2f}" if self._confidence is not None else "NA"
         ram_usage = f"{self.get_ram_usage_mb():.2f}"
+        peak_ram_usage = f"{self.get_peak_ram_usage_mb():.2f}"
 
         # Helper to extract timer values
         def get_avg_time(timer_name: str) -> str:
@@ -328,17 +375,24 @@ class MetricsService:
 
         energy = f"{self.estimate_energy_joules():.2f}"
 
+        # Get peak ram usage during inference
+        inference_peak = "NA"
+        if "inference" in self._timers:
+            # Wir nehmen den höchsten Peak-Wert aller bisherigen Inferenz-Runs
+            runs = self._timers["inference"].runs
+            inference_peak = f"{max((r.peak_interval_mb for r in runs), default=0.0):.2f}"
+
         # CSV header
         header = (
             "Timestamp,Scenario,Model Size (MB),Average Confidence (%),"
-            "RAM Usage (MB),Model Load Time (s),Audio Processing Time (s),"
+            "RAM Usage (MB), Total Peak RAM Usage (MB), Inference Peak RAM Usage (MB), Model Load Time (s),Audio Processing Time (s),"
             "Inference Time (s),Energy (J)\n"
         )
 
         # CSV row
         row = (
             f"{timestamp},{self._scenario},{model_size},{confidence},"
-            f"{ram_usage},{model_load_time},{audio_time},{inference_time},{energy}\n"
+            f"{ram_usage}, {peak_ram_usage}, {inference_peak},{model_load_time},{audio_time},{inference_time},{energy}\n"
         )
 
         # Make directory if it doesn't exist
@@ -356,6 +410,7 @@ class MetricsService:
     def print_summary(self) -> None:
         """Print all collected metrics in a structured, beginner-friendly format."""
         ram_now_mb = self.get_ram_usage_mb()
+        peak_ram_usage = self.get_peak_ram_usage_mb()
         energy_j = self.estimate_energy_joules()
 
         print(f"\n=== PERFORMANCE METRICS for '{self._scenario}'===")
@@ -373,6 +428,7 @@ class MetricsService:
         print(f"Average Confidence: {formated_confidence:.2f} %")
 
         print(f"RAM Usage (current RSS): {ram_now_mb:.2f} MB")
+        print(f"Peak RAM Usage: {peak_ram_usage:.2f} MB")
 
         # Common timers
         for label, timer_name in (

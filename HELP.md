@@ -19,7 +19,7 @@ overlap=0.0, sensitivity=1.0, \
 fmin=200, fmax=12000, \
 merge_consecutive=3, \
 rtype=['table'], \
-combine_results=False, skip_existing_results=True, scenario='respbarry pi zero')"
+combine_results=False, skip_existing_results=True, scenario='respbarry pi zero', benchmark_light_mode=True, benchmark_assumed_cpu_power_watts=0.07)"
 ```
 
 - Startvorgang für das Entwickeln der Performance Klasse:
@@ -40,5 +40,5 @@ overlap=0.0, sensitivity=1.0, \
 fmin=200, fmax=12000, \
 merge_consecutive=3, \
 rtype=['table'], \
-combine_results=False, skip_existing_results=False, scenario='test', benchmark_light_mode=True)"
+combine_results=False, skip_existing_results=False, scenario='test', benchmark_light_mode=True, benchmark_assumed_cpu_power_watts=0.07)"
 ```

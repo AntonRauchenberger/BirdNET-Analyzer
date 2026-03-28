@@ -1,10 +1,5 @@
 """
-Reusable monitoring / benchmarking utilities for BirdNET-Analyzer (or any Python project).
-
-Why this exists:
-- When you optimize for edge devices (e.g., Raspberry Pi Zero), you care about *time*, *CPU*, and *RAM*.
-- This module provides a small, importable service class that can be called from existing code
-  without forcing structural changes.
+Reusable monitoring / benchmarking utilities for BirdNET-Analyzer
 
 Main features:
 - Multiple timers at the same time (by name)
@@ -13,6 +8,7 @@ Main features:
 - Approximate CPU usage based on process CPU-time
 - Estimated energy based on CPU-time (approximation; see `estimate_energy_joules`)
 - Confidence during prediction
+- Light_mode for benchmarking on small devices (controller, ...)
 """
 
 from __future__ import annotations
@@ -23,8 +19,6 @@ import datetime
 import birdnet_analyzer.config as cfg
 from dataclasses import dataclass, field
 from typing import Any, Iterable
-
-import psutil
 
 
 def _bytes_to_mb(num_bytes: float) -> float:
@@ -83,32 +77,21 @@ class _TimerStats:
 class MetricsService:
     """
     A small service class to measure performance metrics during a run.
-
-    Typical usage:
-
-        metrics = MetricsService()
-        metrics.set_model_path("checkpoints/.../model.tflite")
-
-        metrics.start_timer("model_load")
-        # load model ...
-        metrics.stop_timer("model_load")
-
-        metrics.start_timer("audio_processing")
-        # open audio + preprocessing ...
-        metrics.stop_timer("audio_processing")
-
-        metrics.start_timer("inference")
-        # model prediction ...
-        metrics.stop_timer("inference")
-
-        metrics.print_summary()
     """
 
-    def __init__(self, *, model_path: str | None = None, scenario: str = 'original', assumed_cpu_power_watts: float = 5.0) -> None:
+    def __init__(self, *, model_path: str | None = None, scenario: str = 'original', light_mode: bool = False, assumed_cpu_power_watts: float = 5.0) -> None:
+        # Var for enabling to two stage benchmarking
+        self._light_mode: bool = light_mode
+        
         # Power is used for *estimated* energy. Default is a conservative small-device value.
         self.assumed_cpu_power_watts = float(assumed_cpu_power_watts)
 
-        self._proc = psutil.Process(os.getpid())
+        if not self._light_mode:
+            import psutil
+            self._proc = psutil.Process(os.getpid())
+        else:
+            self._proc = None
+
         self._model_path: str | None = None
         self._model_size_mb: float | None = None
 
@@ -120,17 +103,11 @@ class MetricsService:
 
         self.set_model_path(model_path)
 
-        # Optional accuracy storage (you can also compute on-demand)
-        self._accuracy_percent: float | None = None
-
         # Confidence during prediction
         self._confidence: float | None = None
 
         self._scenario = scenario
 
-    # -----------------------------
-    # Model size
-    # -----------------------------
     @staticmethod
     def get_model_size(path: str) -> float:
         """
@@ -155,9 +132,17 @@ class MetricsService:
             # If file is missing, we keep size as unknown.
             self._model_size_mb = None
 
-    # -----------------------------
-    # RAM + CPU (process-level)
-    # -----------------------------
+    def _get_ram_usage_edge(self) -> float:
+        try:
+            with open("/proc/self/status") as f:
+                for line in f:
+                    if "VmRSS" in line:
+                        kb = int(line.split()[1])
+                        return kb / 1024
+        except Exception:
+            return 0.0
+        return 0.0
+
     def get_ram_usage_mb(self) -> float:
         """
         Current RAM usage (RSS) of the current Python process in MB.
@@ -165,7 +150,10 @@ class MetricsService:
         Why it's important:
         - RAM is often the strictest limit on small devices.
         """
-        return _bytes_to_mb(self._proc.memory_info().rss)
+        if not self._light_mode:
+            return _bytes_to_mb(self._proc.memory_info().rss)
+        else:
+            return self._get_ram_usage_edge()
 
     def get_cpu_usage_percent(self, *, interval_s: float = 0.1) -> float:
         """
@@ -174,47 +162,66 @@ class MetricsService:
         Notes:
         - This uses psutil's sampling over a short interval.
         - Good for "current CPU usage now", not for measuring a specific block.
-        """
-        # psutil returns a percent that can exceed 100 on multi-core if you don't normalize.
+        """ 
+        if self._light_mode:
+            return 0.0  # not supported in light mode
+
+        import psutil
+
+        # psutil returns a percent that can exceed 100 on multi-core, has to be normalized
         raw = self._proc.cpu_percent(interval=interval_s)
         cores = psutil.cpu_count(logical=True) or 1
         return raw / cores
 
-    # -----------------------------
-    # Timers (supports multiple)
-    # -----------------------------
     def start_timer(self, name: str) -> None:
         """
         Start a named timer.
 
-        Why it's important:
-        - Lets you separately measure model load time, audio preprocessing time, inference time, etc.
+        Supports:
+        - Extended mode (psutil)
+        - Light mode (os.times, no psutil)
         """
         if name in self._active_starts:
             raise ValueError(f"Timer '{name}' is already running. Stop it before starting again.")
 
-        cpu_times = self._proc.cpu_times()
+        t0 = time.perf_counter()
+
+        if self._light_mode:
+            # Lightweight CPU measurement (works on Raspberry Pi)
+            cpu_times = os.times()
+            cpu0 = float(cpu_times.user + cpu_times.system)
+            rss0 = self._get_ram_usage_edge() * 1024 * 1024
+        else:
+            cpu_times = self._proc.cpu_times()
+            cpu0 = float(cpu_times.user + cpu_times.system)
+            rss0 = int(self._proc.memory_info().rss)
+
         self._active_starts[name] = {
-            "t0": time.perf_counter(),
-            "cpu0": float(cpu_times.user + cpu_times.system),
-            "rss0": int(self._proc.memory_info().rss),
+            "t0": t0,
+            "cpu0": cpu0,
+            "rss0": rss0,
         }
 
     def stop_timer(self, name: str) -> float:
         """
         Stop a named timer and record its measurements.
 
-        Returns:
-            The elapsed wall-clock time in seconds.
+        Works in both extended and light mode.
         """
         snap = self._active_starts.pop(name, None)
         if snap is None:
             raise ValueError(f"Timer '{name}' was not started.")
 
         t1 = time.perf_counter()
-        cpu_times = self._proc.cpu_times()
-        cpu1 = float(cpu_times.user + cpu_times.system)
-        rss1 = int(self._proc.memory_info().rss)
+
+        if self._light_mode:
+            cpu_times = os.times()
+            cpu1 = float(cpu_times.user + cpu_times.system)
+            rss1 = self._get_ram_usage_edge() * 1024 * 1024
+        else:
+            cpu_times = self._proc.cpu_times()
+            cpu1 = float(cpu_times.user + cpu_times.system)
+            rss1 = int(self._proc.memory_info().rss)
 
         wall = max(0.0, t1 - float(snap["t0"]))
         cpu = max(0.0, cpu1 - float(snap["cpu0"]))
@@ -225,8 +232,10 @@ class MetricsService:
             rss_start_bytes=int(snap["rss0"]),
             rss_end_bytes=rss1,
         )
+
         stats = self._timers.setdefault(name, _TimerStats())
         stats.add_run(run)
+
         return wall
 
     def get_timer_stats(self, name: str) -> dict[str, float]:
@@ -240,14 +249,18 @@ class MetricsService:
         - cpu_util_percent (normalized 0..100 across all cores; based on CPU-time / wall-time)
         """
         stats = self._timers.get(name, _TimerStats())
-        cores = psutil.cpu_count(logical=True) or 1
-
         cpu_util = 0.0
-        if stats.total_wall_seconds > 0:
-            # CPU utilization for the block:
-            # (CPU seconds / wall seconds) gives "fraction of one core".
-            # Divide by core count to normalize to 0..100 for the whole machine.
-            cpu_util = (stats.total_cpu_seconds / stats.total_wall_seconds) * 100.0 / cores
+
+        if not self._light_mode:
+            import psutil
+
+            cores = psutil.cpu_count(logical=True) or 1
+
+            if stats.total_wall_seconds > 0:
+                # CPU utilization for the block:
+                # (CPU seconds / wall seconds) gives "fraction of one core".
+                # Divide by core count to normalize to 0..100 for the whole machine.
+                cpu_util = (stats.total_cpu_seconds / stats.total_wall_seconds) * 100.0 / cores
 
         return {
             "count": float(stats.count),
@@ -258,9 +271,6 @@ class MetricsService:
             "cpu_util_percent": float(cpu_util),
         }
 
-    # -----------------------------
-    # Energy estimation (approx.)
-    # -----------------------------
     def estimate_energy_joules(self, cpu_seconds: float | None = None) -> float:
         """
         Estimate energy consumption in Joules (approximation).
@@ -276,36 +286,6 @@ class MetricsService:
         if cpu_seconds is None:
             cpu_seconds = sum(s.total_cpu_seconds for s in self._timers.values())
         return float(cpu_seconds) * float(self.assumed_cpu_power_watts)
-
-    # -----------------------------
-    # Accuracy (optional)
-    # -----------------------------
-    @staticmethod
-    def compute_accuracy(
-        predictions: Iterable[Any],
-        ground_truth: Iterable[Any],
-    ) -> float:
-        """
-        Compute a simple accuracy in percent (0..100) from predicted labels and ground-truth labels.
-
-        Example:
-            predictions = ["Amsel", "Blaumeise"]
-            ground_truth = ["Amsel", "Rotkehlchen"]
-            -> accuracy = 50.0
-        """
-        preds = list(predictions)
-        gts = list(ground_truth)
-        if len(preds) != len(gts):
-            raise ValueError("predictions and ground_truth must have the same length.")
-        if not preds:
-            return 0.0
-        correct = sum(1 for p, t in zip(preds, gts, strict=True) if p == t)
-        return (correct / len(preds)) * 100.0
-
-    def set_accuracy_from_labels(self, predictions: Iterable[Any], ground_truth: Iterable[Any]) -> float:
-        """Compute and store accuracy (%) for printing in the summary."""
-        self._accuracy_percent = self.compute_accuracy(predictions, ground_truth)
-        return float(self._accuracy_percent)
 
     def set_confidence_from_prediction(self, timestamps: list[str], result: dict[str, list]) -> float:
         """
@@ -373,15 +353,14 @@ class MetricsService:
                 f.write(header)
             f.write(row)
 
-    # -----------------------------
-    # Summary printing
-    # -----------------------------
     def print_summary(self) -> None:
         """Print all collected metrics in a structured, beginner-friendly format."""
         ram_now_mb = self.get_ram_usage_mb()
         energy_j = self.estimate_energy_joules()
 
         print(f"\n=== PERFORMANCE METRICS for '{self._scenario}'===")
+
+        print(f"Benchmark Light Mode: {self._light_mode}")
 
         if self._model_size_mb is not None:
             print(f"Model Size: {self._model_size_mb:.2f} MB")
@@ -395,7 +374,7 @@ class MetricsService:
 
         print(f"RAM Usage (current RSS): {ram_now_mb:.2f} MB")
 
-        # Common timers you mentioned; we print them if present, otherwise skip silently.
+        # Common timers
         for label, timer_name in (
             ("Model Load Time", "model_load"),
             ("Audio Processing Time", "audio_processing"),
@@ -425,9 +404,6 @@ class MetricsService:
                 print(f"{name}: {stats['total_wall_s']:.4f} s total | {stats['avg_wall_s']:.4f} s avg (n={n})")
 
         print(f"Energy (estimated): {energy_j:.2f} J (approx.)")
-
-        if self._accuracy_percent is not None:
-            print(f"Accuracy: {self._accuracy_percent:.2f} %")
 
         print("===========================\n")
 

@@ -40,5 +40,5 @@ overlap=0.0, sensitivity=1.0, \
 fmin=200, fmax=12000, \
 merge_consecutive=3, \
 rtype=['table'], \
-combine_results=False, skip_existing_results=False, scenario='test')"
+combine_results=False, skip_existing_results=False, scenario='test', benchmark_light_mode=True)"
 ```

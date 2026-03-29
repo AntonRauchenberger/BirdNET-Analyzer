@@ -1,5 +1,7 @@
 import os
 
+from birdnet_analyzer.metrics_service import MetricsService
+
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 
 #################
@@ -249,6 +251,8 @@ MODEL_PATH: str | None = None
 LABELS_FILE: str | None = None
 SAMPLE_RATE: int | None = None
 SIG_LENGTH: float | None = None
+
+METRICS_SERVICE: MetricsService | None = None
 
 ######################
 # Get and set config #

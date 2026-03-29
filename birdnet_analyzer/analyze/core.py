@@ -3,6 +3,7 @@ from typing import Literal
 
 from tqdm import tqdm
 
+from birdnet_analyzer.metrics_service import MetricsService
 
 def analyze(
     audio_input: str,
@@ -31,6 +32,9 @@ def analyze(
     locale: str = "en",
     additional_columns: list[str] | None = None,
     use_perch: bool = False,
+    scenario: str | None = 'original',
+    benchmark_light_mode: bool = False,
+    benchmark_assumed_cpu_power_watts: float = 0.5
 ):
     """
     Analyzes audio files for bird species detection using the BirdNET-Analyzer.
@@ -102,6 +106,9 @@ def analyze(
         additional_columns=additional_columns,
         use_perch=use_perch,
         show_progress=show_progress,
+        scenario=scenario,
+        benchmark_light_mode=benchmark_light_mode,
+        benchmark_assumed_cpu_power_watts=benchmark_assumed_cpu_power_watts
     )
 
     print(f"Found {len(cfg.FILE_LIST)} files to analyze")
@@ -156,6 +163,9 @@ def _set_params(
     additional_columns=None,
     use_perch=False,
     show_progress=True,
+    scenario='original',
+    benchmark_light_mode=False,
+    benchmark_assumed_cpu_power_watts=0.5
 ):
     import birdnet_analyzer.config as cfg
     from birdnet_analyzer.analyze.utils import load_codes
@@ -295,5 +305,16 @@ def _set_params(
             cfg.TRANSLATED_LABELS = cfg.LABELS
     else:
         cfg.TRANSLATED_LABELS = cfg.LABELS
+
+    # Initialize metrics service for performance monitoring
+    model_path = None
+    if (cfg.MODEL_PATH):
+        model_path = cfg.MODEL_PATH
+    elif (cfg.MDATA_MODEL_PATH):
+        model_path = cfg.MDATA_MODEL_PATH
+    elif (cfg.BIRDNET_MODEL_PATH):
+        model_path = cfg.BIRDNET_MODEL_PATH
+
+    cfg.METRICS_SERVICE = MetricsService(model_path=model_path, scenario=scenario, light_mode=benchmark_light_mode, assumed_cpu_power_watts=benchmark_assumed_cpu_power_watts)
 
     return [(f, cfg.get_config()) for f in cfg.FILE_LIST]

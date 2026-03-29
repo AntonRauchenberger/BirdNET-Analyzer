@@ -350,6 +350,9 @@ def save_result_files(r: dict[str, list], result_files: dict[str, str], afile_pa
     # Selection table
     timestamps = get_sorted_timestamps(r_merged)
 
+    # Save confidence to metrics
+    cfg.METRICS_SERVICE.set_confidence_from_prediction(timestamps, r_merged)
+
     if "table" in result_files:
         generate_raven_table(timestamps, r_merged, afile_path, result_files["table"])
 
@@ -666,7 +669,10 @@ def iterate_audio_chunks(fpath: str, embeddings: bool = False):
     duration = int(cfg.FILE_SPLITTING_DURATION / cfg.AUDIO_SPEED)
 
     while start < fileLengthSeconds and not np.isclose(start, fileLengthSeconds):
+        cfg.METRICS_SERVICE.start_timer("audio_processing")
         chunks = get_raw_audio_from_file(fpath, start, duration)
+        cfg.METRICS_SERVICE.stop_timer("audio_processing")
+        
         samples = []
         timestamps = []
 
@@ -686,7 +692,9 @@ def iterate_audio_chunks(fpath: str, embeddings: bool = False):
                 continue
 
             # Predict
+            cfg.METRICS_SERVICE.start_timer("inference")
             p = model.embeddings(samples) if embeddings else predict(samples)
+            cfg.METRICS_SERVICE.stop_timer("inference")
 
             # Add to results
             for i in range(len(samples)):
@@ -834,5 +842,8 @@ def analyze_file(item) -> dict[str, str] | None:
     delta_time = (datetime.datetime.now() - start_time).total_seconds()
     if not cfg.SHOW_PROGRESS:
         print(f"Finished {fpath} in {delta_time:.2f} seconds", flush=True)
+
+    cfg.METRICS_SERVICE.write_to_csv_log()
+    cfg.METRICS_SERVICE.print_summary()
 
     return result_file_names
